@@ -1,4 +1,4 @@
-/* $NetBSD: main.c,v 1.10 2007/12/12 04:17:49 nisimura Exp $ */
+/* $NetBSD: main.c,v 1.16 2008/04/28 20:23:34 martin Exp $ */
 
 /*-
  * Copyright (c) 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -90,7 +83,7 @@ main()
 	struct btinfo_clock bi_clk;
 	struct btinfo_bootpath bi_path;
 	struct btinfo_rootdevice bi_rdev;
-	unsigned lnif[1][2];
+	unsigned lnif[1][2], lata[1][2];
 
 	/* determine SDRAM size */
 	memsize = mpc107memsize();
@@ -104,7 +97,19 @@ main()
 	case BRD_ENCOREPP1:
 		printf("Encore PP1"); break;
 	}
-	printf(", %dMB SDRAM, ", memsize >> 20);
+	printf(", %dMB SDRAM\n", memsize >> 20);
+
+	n = pcilookup(PCI_CLASS_IDE, lata, sizeof(lata)/sizeof(lata[0]));
+	if (n == 0)
+		printf("no IDE found\n");
+	else {
+		tag = lata[0][1];
+		pcidecomposetag(tag, &b, &d, &f);
+		printf("%04x.%04x IDE %02d:%02d:%02d\n",
+		    PCI_VENDOR(lata[0][0]), PCI_PRODUCT(lata[0][0]),
+		    b, d, f);
+	}
+
 	n = pcilookup(PCI_CLASS_ETH, lnif, sizeof(lnif)/sizeof(lnif[0]));
 	if (n == 0) {
 		tag = ~0;
@@ -187,7 +192,7 @@ unsigned uartbase;
 void
 brdsetup()
 {
-	unsigned pchb, pcib;
+	unsigned pchb, pcib, div;
 
 	/* BAT to arrange address space */
 
@@ -210,11 +215,12 @@ brdsetup()
 		uartbase = 0xfe000000 + CONSPORT; /* 0x3f8, 0x2f8 */
 	else {
 		uartbase = 0xfc000000 + CONSPORT; /* 0x4500, 0x4600 */
+		div = (TICKS_PER_SEC * 4) / CONSSPEED / 16;
 		UART_WRITE(DCR, 0x01);	/* 2 independent UART */
 		UART_WRITE(LCR, 0x80);	/* turn on DLAB bit */
 		UART_WRITE(FCR, 0x00);
-		UART_WRITE(DMB, 0x00);
-		UART_WRITE(DLB, 0x36);	/* 115200bps @ 100MHz, DINK32 sez */
+		UART_WRITE(DMB, div >> 8);
+		UART_WRITE(DLB, div & 0xff); /* 0x36 when 115200bps@100MHz */
 		UART_WRITE(LCR, 0x03);	/* 8 N 1 */
 		UART_WRITE(MCR, 0x03);	/* RTS DTR */
 		UART_WRITE(FCR, 0x07);	/* FIFO_EN | RXSR | TXSR */
@@ -666,14 +672,24 @@ pcifixup()
 		val |= (0x8a << 8);
 		pcicfgwrite(ide, 0x08, val);
 
-		/* ide: 0x10-20 - in this mode HW ignores these addresses */
+		/* ide: 0x10-20 */
+		/*
+		experiment shows writing ide: 0x09 changes these
+		register behaviour. The pcicfgwrite() above writes
+		0x8a at ide: 0x09 to make sure legacy IDE.  Then
+		reading BAR0-3 is to return value 0s even though
+		pcisetup() has written range assignments.  Value
+		overwrite makes no effect. Having 0x8f for native
+		PCIIDE doesn't change register values and brings no
+		weirdness.
+		 */
 
 		/* ide: 0x40 - use primary only */
 		val = pcicfgread(ide, 0x40) &~ 03;
 		val |= 02;
 		pcicfgwrite(ide, 0x40, val);
 
-		/* ide: 0x3d/3c - turn off PCI pin */
+			/* ide: 0x3d/3c - turn off PCI pin */
 		val = pcicfgread(ide, 0x3c) & 0xffff00ff;
 		pcicfgwrite(ide, 0x3c, val);
 #endif
@@ -703,3 +719,52 @@ pcifixup()
 		break;
 	}
 }
+
+#if 0
+static const char *cmdln[] = {
+	"console=ttyS0,115200 root=/dev/sda1 rw initrd=0x200000,2M",
+	"console=ttyS0,115200 root=/dev/nfs ip=dhcp"
+};
+
+void
+mkatagparams(addr, kcmd)
+	unsigned addr;
+	char *kcmd;
+{
+	struct tag {
+		unsigned siz;
+		unsigned tag;
+		unsigned val[1];
+	};
+	struct tag *p;
+#define ATAG_CORE 	0x54410001
+#define ATAG_MEM	0x54410002
+#define ATAG_INITRD	0x54410005
+#define ATAG_CMDLINE	0x54410009
+#define ATAG_NONE	0x00000000
+#define tagnext(p) (struct tag *)((unsigned *)(p) + (p)->siz)
+#define tagsize(n) (2 + (n))
+
+	p = (struct tag *)addr;
+	p->tag = ATAG_CORE;
+	p->siz = tagsize(3);
+	p->val[0] = 0;		/* flags */
+	p->val[1] = 0;		/* pagesize */
+	p->val[2] = 0;		/* rootdev */
+	p = tagnext(p);
+	p->tag = ATAG_MEM;
+	p->siz = tagsize(2);
+	p->val[0] = 64 * 1024 * 1024;
+	p->val[1] = 0;		/* start */
+	p = tagnext(p);
+	if (kcmd != NULL) {
+		p = tagnext(p);
+		p->tag = ATAG_CMDLINE;
+		p->siz = tagsize((strlen(kcmd) + 1 + 3) >> 2);
+		strcpy((void *)p->val, kcmd);
+	}
+	p = tagnext(p);
+	p->tag = ATAG_NONE;
+	p->siz = 0;
+}
+#endif

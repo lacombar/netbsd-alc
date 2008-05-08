@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.505 2008/03/31 02:42:27 lukem Exp $
+#	$NetBSD: bsd.own.mk,v 1.509 2008/05/03 14:48:31 lukem Exp $
 
 .if !defined(_BSD_OWN_MK_)
 _BSD_OWN_MK_=1
@@ -243,7 +243,7 @@ TOOL_MSGC=		MSGDEF=${TOOLDIR}/share/misc ${TOOLDIR}/bin/${_TOOL_PREFIX}msgc
 TOOL_MTREE=		${TOOLDIR}/bin/${_TOOL_PREFIX}mtree
 TOOL_PAX=		${TOOLDIR}/bin/${_TOOL_PREFIX}pax
 TOOL_PIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}pic
-TOOL_PREPMKBOOTIMAGE=	${TOOLDIR}/bin/${_TOOL_PREFIX}prep-mkbootimage
+TOOL_POWERPCMKBOOTIMAGE=${TOOLDIR}/bin/${_TOOL_PREFIX}powerpc-mkbootimage
 TOOL_PWD_MKDB=		${TOOLDIR}/bin/${_TOOL_PREFIX}pwd_mkdb
 TOOL_REFER=		${TOOLDIR}/bin/${_TOOL_PREFIX}refer
 TOOL_ROFF_ASCII=	PATH=${TOOLDIR}/lib/groff:$${PATH} ${TOOLDIR}/bin/${_TOOL_PREFIX}nroff
@@ -354,6 +354,11 @@ KMODDIR?=	/usr/lkm
 KMODGRP?=	wheel
 KMODOWN?=	root
 KMODMODE?=	${NONBINMODE}
+
+KMODULEDIR?=	/kernel/modules
+KMODULEGRP?=	wheel
+KMODULEOWN?=	root
+KMODULEMODE?=	${NONBINMODE}
 
 LOCALEDIR?=	/usr/share/locale
 LOCALEGRP?=	wheel
@@ -562,7 +567,7 @@ ${var}?=	yes
 #
 .for var in \
 	MKCRYPTO_IDEA MKCRYPTO_MDC2 MKCRYPTO_RC5 MKDEBUG MKDEBUGLIB \
-	MKMANZ MKMODULAR MKOBJDIRS MKPRIVATELIB MKPUFFS MKSOFTFLOAT \
+	MKMANZ MKMODULAR MKOBJDIRS MKPUFFS MKSOFTFLOAT \
 	MKUNPRIVED MKUPDATE MKX11
 ${var}?=no
 .endfor
@@ -581,6 +586,7 @@ MKHTML:=	no
 .endif
 
 .if ${MKLINKLIB} == "no"
+MKLINT:=	no
 MKPICINSTALL:=	no
 MKPROFILE:=	no
 .endif

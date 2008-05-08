@@ -1,4 +1,4 @@
-/*	$NetBSD: adb_bt.c,v 1.2 2008/03/26 18:04:15 matt Exp $ */
+/*	$NetBSD: adb_bt.c,v 1.4 2008/04/29 06:53:02 martin Exp $ */
 
 /*-
  * Copyright (c) 2006 Michael Lorenz
@@ -12,9 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -30,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: adb_bt.c,v 1.2 2008/03/26 18:04:15 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: adb_bt.c,v 1.4 2008/04/29 06:53:02 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -171,7 +168,7 @@ adbbt_handler(void *cookie, int len, uint8_t *data)
 
 #ifdef ADBBT_DEBUG
 	int i;
-	printf("%s: %02x - ", sc->sc_dev.dv_xname, sc->sc_us);
+	printf("%s: %02x - ", device_xname(&sc->sc_dev), sc->sc_us);
 	for (i = 0; i < len; i++) {
 		printf(" %02x", data[i]);
 	}

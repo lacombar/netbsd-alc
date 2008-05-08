@@ -1,4 +1,4 @@
-/*	$NetBSD: xenfunc.c,v 1.4 2008/02/17 14:03:16 bouyer Exp $	*/
+/*	$NetBSD: xenfunc.c,v 1.6 2008/04/30 00:16:30 cegger Exp $	*/
 
 /*
  *
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xenfunc.c,v 1.4 2008/02/17 14:03:16 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xenfunc.c,v 1.6 2008/04/30 00:16:30 cegger Exp $");
 
 #include <sys/param.h>
 
@@ -85,12 +85,12 @@ ltr(u_short sel)
 }
 
 void
-lcr0(u_int val)
+lcr0(u_long val)
 {
 	__PRINTK(("XXX lcr0 not supported\n"));
 }
 
-u_int
+u_long
 rcr0(void)
 {
 	__PRINTK(("XXX rcr0 not supported\n"));
@@ -150,7 +150,7 @@ vaddr_t
 rcr2(void)
 {
 #ifdef XEN3
-	return HYPERVISOR_shared_info->vcpu_info[0].arch.cr2; /* XXX curcpu */
+	return curcpu()->ci_vcpu->arch.cr2;
 #else
 	return 0;
 #endif

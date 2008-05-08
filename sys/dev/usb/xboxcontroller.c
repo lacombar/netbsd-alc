@@ -1,4 +1,4 @@
-/* $NetBSD: xboxcontroller.c,v 1.7 2008/02/18 05:24:24 dyoung Exp $ */
+/* $NetBSD: xboxcontroller.c,v 1.9 2008/05/05 00:22:06 jmcneill Exp $ */
 
 /*-
  * Copyright (c) 2007 Jared D. McNeill <jmcneill@invisible.ca>
@@ -12,12 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by Jared D. McNeill.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -33,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xboxcontroller.c,v 1.7 2008/02/18 05:24:24 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xboxcontroller.c,v 1.9 2008/05/05 00:22:06 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -145,7 +139,7 @@ USB_ATTACH(xboxcontroller)
 
 	ed = usbd_interface2endpoint_descriptor(sc->sc_iface, 0);
 	if (ed == NULL) {
-		aprint_error("%s: couldn't get ep 0\n", USBDEVNAME(sc->sc_dev));
+		aprint_error_dev(&sc->sc_dev, "couldn't get ep 0\n");
 		sc->sc_dying = 1;
 		USB_ATTACH_ERROR_RETURN;
 	}

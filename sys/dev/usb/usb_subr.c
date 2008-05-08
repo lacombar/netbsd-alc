@@ -1,4 +1,4 @@
-/*	$NetBSD: usb_subr.c,v 1.151 2008/03/28 17:14:46 drochner Exp $	*/
+/*	$NetBSD: usb_subr.c,v 1.153 2008/04/28 20:24:00 martin Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_subr.c,v 1.18 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
@@ -17,13 +17,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -39,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: usb_subr.c,v 1.151 2008/03/28 17:14:46 drochner Exp $");
+__KERNEL_RCSID(0, "$NetBSD: usb_subr.c,v 1.153 2008/04/28 20:24:00 martin Exp $");
 
 #include "opt_compat_netbsd.h"
 #include "opt_usbverbose.h"
@@ -1488,7 +1481,7 @@ void
 usb_disconnect_port(struct usbd_port *up, device_ptr_t parent)
 {
 	usbd_device_handle dev = up->device;
-	char *hubname = USBDEVPTRNAME(parent);
+	const char *hubname = USBDEVPTRNAME(parent);
 	int i;
 
 	DPRINTFN(3,("uhub_disconnect: up=%p dev=%p port=%d\n",

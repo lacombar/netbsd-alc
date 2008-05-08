@@ -1,4 +1,4 @@
-/* $NetBSD: drm_memory.c,v 1.8 2008/03/13 05:35:43 bjs Exp $ */
+/* $NetBSD: drm_memory.c,v 1.10 2008/05/06 01:45:47 bjs Exp $ */
 
 /* drm_memory.h -- Memory management wrappers for DRM -*- linux-c -*-
  * Created: Thu Feb  4 14:00:34 1999 by faith@valinux.com
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: drm_memory.c,v 1.8 2008/03/13 05:35:43 bjs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: drm_memory.c,v 1.10 2008/05/06 01:45:47 bjs Exp $");
 /*
 __FBSDID("$FreeBSD: src/sys/dev/drm/drm_memory.c,v 1.2 2005/11/28 23:13:52 anholt Exp $");
 */

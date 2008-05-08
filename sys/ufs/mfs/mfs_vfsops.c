@@ -1,4 +1,4 @@
-/*	$NetBSD: mfs_vfsops.c,v 1.91 2008/03/26 14:19:43 ad Exp $	*/
+/*	$NetBSD: mfs_vfsops.c,v 1.96 2008/05/06 18:43:45 ad Exp $	*/
 
 /*
  * Copyright (c) 1989, 1990, 1993, 1994
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.91 2008/03/26 14:19:43 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.96 2008/05/06 18:43:45 ad Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -53,7 +53,6 @@ __KERNEL_RCSID(0, "$NetBSD: mfs_vfsops.c,v 1.91 2008/03/26 14:19:43 ad Exp $");
 
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/specfs/specdev.h>
-#include <miscfs/syncfs/syncfs.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -108,6 +107,7 @@ struct vfsops mfs_vfsops = {
 	(void *)eopnotsupp,	/* vfs_suspendctl */
 	genfs_renamelock_enter,
 	genfs_renamelock_exit,
+	(void *)eopnotsupp,
 	mfs_vnodeopv_descs,
 	0,
 	{ NULL, NULL },
@@ -198,7 +198,7 @@ mfs_mountroot(void)
 	mfsp->mfs_refcnt = 1;
 	bufq_alloc(&mfsp->mfs_buflist, "fcfs", 0);
 	if ((error = ffs_mountfs(rootvp, mp, l)) != 0) {
-		vfs_unbusy(mp, false);
+		vfs_unbusy(mp, false, NULL);
 		bufq_free(mfsp->mfs_buflist);
 		vfs_destroy(mp);
 		kmem_free(mfsp, sizeof(*mfsp));
@@ -212,7 +212,7 @@ mfs_mountroot(void)
 	fs = ump->um_fs;
 	(void) copystr(mp->mnt_stat.f_mntonname, fs->fs_fsmnt, MNAMELEN - 1, 0);
 	(void)ffs_statvfs(mp, &mp->mnt_stat);
-	vfs_unbusy(mp, false);
+	vfs_unbusy(mp, false, NULL);
 	return (0);
 }
 
@@ -372,14 +372,14 @@ mfs_start(struct mount *mp, int flags)
 	 * Add a reference to the mfsnode to prevent it disappearing in
 	 * this routine.
 	 */
-	if ((error = vfs_busy(mp, RW_READER, NULL)) != 0)
+	if ((error = vfs_busy(mp, NULL)) != 0)
 		return error;
 	vp = VFSTOUFS(mp)->um_devvp;
 	mfsp = VTOMFS(vp);
 	mutex_enter(&mfs_lock);
 	mfsp->mfs_refcnt++;
 	mutex_exit(&mfs_lock);
-	vfs_unbusy(mp, false);
+	vfs_unbusy(mp, false, NULL);
 
 	base = mfsp->mfs_baseoff;
 	mutex_enter(&mfs_lock);
@@ -398,19 +398,12 @@ mfs_start(struct mount *mp, int flags)
 		 */
 		if (sleepreturn != 0) {
 			mutex_exit(&mfs_lock);
-			/*
-			 * XXX Freeze syncer.  Must do this before locking
-			 * the mount point.  See dounmount() for details.
-			 */
-			mutex_enter(&syncer_mutex);
-			if (vfs_trybusy(mp, RW_WRITER, NULL) != 0)
-				mutex_exit(&syncer_mutex);
-			else if (dounmount(mp, 0, curlwp) != 0) {
+			if (dounmount(mp, 0, curlwp) != 0) {
 				p = curproc;
 				ksiginfo_queue_init(&kq);
-				mutex_enter(&p->p_smutex);
+				mutex_enter(p->p_lock);
 				sigclearall(p, NULL, &kq);
-				mutex_exit(&p->p_smutex);
+				mutex_exit(p->p_lock);
 				ksiginfo_queue_drain(&kq);
 			}
 			sleepreturn = 0;

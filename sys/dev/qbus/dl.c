@@ -1,4 +1,4 @@
-/*	$NetBSD: dl.c,v 1.39 2007/11/19 18:51:49 ad Exp $	*/
+/*	$NetBSD: dl.c,v 1.41 2008/04/28 20:23:56 martin Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -111,7 +104,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dl.c,v 1.39 2007/11/19 18:51:49 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dl.c,v 1.41 2008/04/28 20:23:56 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -260,9 +253,9 @@ dl_attach (struct device *parent, struct device *self, void *aux)
 	uba_intr_establish(ua->ua_icookie, ua->ua_cvec - 4,
 		dlrint, sc, &sc->sc_rintrcnt);
 	evcnt_attach_dynamic(&sc->sc_rintrcnt, EVCNT_TYPE_INTR, ua->ua_evcnt,
-		sc->sc_dev.dv_xname, "rintr");
+		device_xname(&sc->sc_dev), "rintr");
 	evcnt_attach_dynamic(&sc->sc_tintrcnt, EVCNT_TYPE_INTR, ua->ua_evcnt,
-		sc->sc_dev.dv_xname, "tintr");
+		device_xname(&sc->sc_dev), "tintr");
 
 	printf("\n");
 }
@@ -293,7 +286,7 @@ dlrint(void *arg)
 			 * else where we can afford the time.
 			 */
 			log(LOG_WARNING, "%s: rx overrun\n",
-			    sc->sc_dev.dv_xname);
+			    device_xname(&sc->sc_dev));
 		}
 		if (c & DL_RBUF_FRAMING_ERR)
 			cc |= TTY_FE;
@@ -304,7 +297,7 @@ dlrint(void *arg)
 #if defined(DIAGNOSTIC)
 	} else {
 		log(LOG_WARNING, "%s: stray rx interrupt\n",
-		    sc->sc_dev.dv_xname);
+		    device_xname(&sc->sc_dev));
 #endif
 	}
 }

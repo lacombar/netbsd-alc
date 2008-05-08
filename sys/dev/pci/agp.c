@@ -1,4 +1,4 @@
-/*	$NetBSD: agp.c,v 1.55 2008/02/29 06:13:39 dyoung Exp $	*/
+/*	$NetBSD: agp.c,v 1.57 2008/04/19 09:26:56 njoly Exp $	*/
 
 /*-
  * Copyright (c) 2000 Doug Rabson
@@ -65,7 +65,7 @@
 
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: agp.c,v 1.55 2008/02/29 06:13:39 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: agp.c,v 1.57 2008/04/19 09:26:56 njoly Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -119,6 +119,11 @@ const struct agp_product {
 	int		(*ap_match)(const struct pci_attach_args *);
 	int		(*ap_attach)(struct device *, struct device *, void *);
 } agp_products[] = {
+#if NAGP_AMD64 > 0
+	{ PCI_VENDOR_ALI,	PCI_PRODUCT_ALI_M1689,
+	  agp_amd64_match,	agp_amd64_attach },
+#endif
+
 #if NAGP_ALI > 0
 	{ PCI_VENDOR_ALI,	-1,
 	  NULL,			agp_ali_attach },
@@ -429,7 +434,7 @@ agp_generic_enable(struct agp_softc *sc, u_int32_t mode)
 	if (pci_find_device(&pa, agpdev_match) == 0 ||
 	    pci_get_capability(pa.pa_pc, pa.pa_tag, PCI_CAP_AGP,
 	     &capoff, NULL) == 0) {
-		printf("%s: can't find display\n", sc->as_dev.dv_xname);
+		aprint_error_dev(&sc->as_dev, "can't find display\n");
 		return ENXIO;
 	}
 
@@ -545,7 +550,7 @@ agp_generic_bind_memory(struct agp_softc *sc, struct agp_memory *mem,
 	mutex_enter(&sc->as_mtx);
 
 	if (mem->am_is_bound) {
-		printf("%s: memory already bound\n", sc->as_dev.dv_xname);
+		aprint_error_dev(&sc->as_dev, "memory already bound\n");
 		mutex_exit(&sc->as_mtx);
 		return EINVAL;
 	}
@@ -553,8 +558,8 @@ agp_generic_bind_memory(struct agp_softc *sc, struct agp_memory *mem,
 	if (offset < 0
 	    || (offset & (AGP_PAGE_SIZE - 1)) != 0
 	    || offset + mem->am_size > AGP_GET_APERTURE(sc)) {
-		printf("%s: binding memory at bad offset %#lx\n",
-			      sc->as_dev.dv_xname, (unsigned long) offset);
+		aprint_error_dev(&sc->as_dev, "binding memory at bad offset %#lx\n",
+			      (unsigned long) offset);
 		mutex_exit(&sc->as_mtx);
 		return EINVAL;
 	}
@@ -680,7 +685,7 @@ agp_generic_unbind_memory(struct agp_softc *sc, struct agp_memory *mem)
 	mutex_enter(&sc->as_mtx);
 
 	if (!mem->am_is_bound) {
-		printf("%s: memory is not bound\n", sc->as_dev.dv_xname);
+		aprint_error_dev(&sc->as_dev, "memory is not bound\n");
 		mutex_exit(&sc->as_mtx);
 		return EINVAL;
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: ucycom.c,v 1.20 2007/12/11 12:16:34 lukem Exp $	*/
+/*	$NetBSD: ucycom.c,v 1.22 2008/04/28 20:23:59 martin Exp $	*/
 
 /*
  * Copyright (c) 2005 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -45,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ucycom.c,v 1.20 2007/12/11 12:16:34 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ucycom.c,v 1.22 2008/04/28 20:23:59 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -907,7 +900,7 @@ ucycom_intr(struct uhidev *addr, void *ibuf, u_int len)
 		DPRINTFN(7,("ucycom_intr: char=0x%02x\n", *cp));
 		if ((*rint)(*cp++, tp) == -1) {
 			/* XXX what should we do? */
-			printf("%s: lost a character\n", USBDEVNAME(sc->sc_hdev.sc_dev));
+			aprint_error_dev(&sc->sc_hdev.sc_dev, "lost a character\n");
 			break;
 		}
 	}

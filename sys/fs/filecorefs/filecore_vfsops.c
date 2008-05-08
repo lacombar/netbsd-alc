@@ -1,4 +1,4 @@
-/*	$NetBSD: filecore_vfsops.c,v 1.49 2008/02/05 15:19:38 ad Exp $	*/
+/*	$NetBSD: filecore_vfsops.c,v 1.52 2008/05/06 18:43:44 ad Exp $	*/
 
 /*-
  * Copyright (c) 1994 The Regents of the University of California.
@@ -66,7 +66,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: filecore_vfsops.c,v 1.49 2008/02/05 15:19:38 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: filecore_vfsops.c,v 1.52 2008/05/06 18:43:44 ad Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -129,6 +129,7 @@ struct vfsops filecore_vfsops = {
 	(void *)eopnotsupp,		/* vfs_suspendctl */
 	genfs_renamelock_enter,
 	genfs_renamelock_exit,
+	(void *)eopnotsupp,
 	filecore_vnodeopv_descs,
 	0,
 	{ NULL, NULL }
@@ -172,7 +173,7 @@ filecore_mountroot()
 
 	args.flags = FILECOREMNT_ROOT;
 	if ((error = filecore_mountfs(rootvp, mp, p, &args)) != 0) {
-		vfs_unbusy(mp, false);
+		vfs_unbusy(mp, false, NULL);
 		vfs_destroy(mp);
 		return (error);
 	}
@@ -180,7 +181,7 @@ filecore_mountroot()
 	CIRCLEQ_INSERT_TAIL(&mountlist, mp, mnt_list);
 	simple_unlock(&mountlist_slock);
 	(void)filecore_statvfs(mp, &mp->mnt_stat, p);
-	vfs_unbusy(mp, false);
+	vfs_unbusy(mp, false, NULL);
 	return (0);
 }
 #endif

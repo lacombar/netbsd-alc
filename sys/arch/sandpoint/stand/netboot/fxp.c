@@ -1,4 +1,4 @@
-/* $NetBSD: fxp.c,v 1.6 2007/11/29 04:00:17 nisimura Exp $ */
+/* $NetBSD: fxp.c,v 1.8 2008/04/28 20:23:34 martin Exp $ */
 
 /*
  * most of the following code was imported from dev/ic/i82557.c; the
@@ -21,13 +21,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -190,11 +183,11 @@ fxp_init(unsigned tag, void *data)
 	unsigned v, i;
 
 	v = pcicfgread(tag, PCI_ID_REG);
-	if (PCI_VENDOR(v) != 0x8086 ||
-		    (PCI_PRODUCT(v) != 0x1209 && PCI_PRODUCT(v) != 0x1229))
+	if (PCI_DEVICE(0x8086, 0x1209) != v
+	    && PCI_DEVICE(0x8086, 0x1229) != v)
 		return NULL;
 
-	sc = ALLOC(struct local, sizeof(struct txdesc));
+	sc = ALLOC(struct local, sizeof(struct txdesc)); /* desc alignment */
 	memset(sc, 0, sizeof(struct local));
 	sc->iobase = DEVTOV(pcicfgread(tag, 0x10)); /* use mem space */
 

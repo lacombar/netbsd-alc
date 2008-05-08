@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_turnstile.c,v 1.16 2008/03/17 16:54:51 ad Exp $	*/
+/*	$NetBSD: kern_turnstile.c,v 1.20 2008/04/28 20:24:04 martin Exp $	*/
 
 /*-
  * Copyright (c) 2002, 2006, 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -59,7 +52,7 @@
  * operation.
  *
  * When a thread is awakened, it needs to get its turnstile back.  If there
- * are still other threads waiting in the active turnstile, the the thread
+ * are still other threads waiting in the active turnstile, the thread
  * grabs a free turnstile off the free list.  Otherwise, it can take back
  * the active turnstile from the lock (thus deactivating the turnstile).
  *
@@ -67,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_turnstile.c,v 1.16 2008/03/17 16:54:51 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_turnstile.c,v 1.20 2008/04/28 20:24:04 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/lockdebug.h>
@@ -217,7 +210,7 @@ turnstile_block(turnstile_t *ts, int q, wchan_t obj, syncobj_t *sobj)
 	turnstile_t *ots;
 	tschain_t *tc;
 	sleepq_t *sq;
-	pri_t prio;
+	pri_t prio, obase;
 
 	tc = &turnstile_tab[TS_HASH(obj)];
 	l = cur = curlwp;
@@ -261,7 +254,17 @@ turnstile_block(turnstile_t *ts, int q, wchan_t obj, syncobj_t *sobj)
 	sleepq_enter(sq, l);
 	LOCKDEBUG_BARRIER(&tc->tc_mutex, 1);
 	l->l_kpriority = true;
+	obase = l->l_kpribase;
+	if (obase < PRI_KTHREAD)
+		l->l_kpribase = PRI_KTHREAD;
 	sleepq_enqueue(sq, obj, "tstile", sobj);
+
+	/*
+	 * Disable preemption across this entire block, as we may drop
+	 * scheduler locks (allowing preemption), and would prefer not
+	 * to be interrupted while in a state of flux.
+	 */
+	KPREEMPT_DISABLE(l);
 
 	/*
 	 * lend our priority to lwps on the blocking chain.
@@ -322,6 +325,8 @@ turnstile_block(turnstile_t *ts, int q, wchan_t obj, syncobj_t *sobj)
 	LOCKDEBUG_BARRIER(cur->l_mutex, 1);
 
 	sleepq_block(0, false);
+	cur->l_kpribase = obase;
+	KPREEMPT_ENABLE(cur);
 }
 
 /*

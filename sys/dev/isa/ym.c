@@ -1,4 +1,4 @@
-/*	$NetBSD: ym.c,v 1.32 2007/10/19 12:00:24 ad Exp $	*/
+/*	$NetBSD: ym.c,v 1.35 2008/04/28 20:23:52 martin Exp $	*/
 
 /*-
  * Copyright (c) 1999-2002 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -67,7 +60,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ym.c,v 1.32 2007/10/19 12:00:24 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ym.c,v 1.35 2008/04/28 20:23:52 martin Exp $");
 
 #include "mpu_ym.h"
 #include "opt_ym.h"
@@ -145,7 +138,7 @@ int	ymdebug = 0;
 #else
 #define DPRINTF(x)
 #endif
-#define DVNAME(softc)	((softc)->sc_ad1848.sc_ad1848.sc_dev.dv_xname)
+#define DVNAME(softc)	(device_xname(&(softc)->sc_ad1848.sc_ad1848.sc_dev))
 
 int	ym_getdev(void *, struct audio_device *);
 int	ym_mixer_set_port(void *, mixer_ctrl_t *);
@@ -1017,11 +1010,13 @@ ym_query_devinfo(void *addr, mixer_devinfo_t *dip)
 int
 ym_intr(void *arg)
 {
-	struct ym_softc *sc;
+	struct ym_softc *sc = arg;
+#if NMPU_YM > 0
+	struct mpu_softc *sc_mpu = device_private(sc->sc_mpudev);
+#endif
 	u_int8_t ist;
 	int processed;
 
-	sc = arg;
 	/* OPL3 timer is currently unused. */
 	if (((ist = ym_read(sc, SA3_IRQA_STAT)) &
 	     ~(SA3_IRQ_STAT_SB|SA3_IRQ_STAT_OPL3)) == 0) {
@@ -1044,7 +1039,7 @@ ym_intr(void *arg)
 		 * MPU401 interrupt.
 		 */
 		if (ist & SA3_IRQ_STAT_MPU) {
-			mpu_intr(sc->sc_mpudev);
+			mpu_intr(sc_mpu);
 			processed = 1;
 		}
 #endif

@@ -1,4 +1,4 @@
-/* $NetBSD: subr_autoconf.c,v 1.141 2008/03/12 18:02:22 dyoung Exp $ */
+/* $NetBSD: subr_autoconf.c,v 1.147 2008/04/29 14:35:21 rmind Exp $ */
 
 /*
  * Copyright (c) 1996, 2000 Christopher G. Demetriou
@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_autoconf.c,v 1.141 2008/03/12 18:02:22 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_autoconf.c,v 1.147 2008/04/29 14:35:21 rmind Exp $");
 
 #include "opt_multiprocessor.h"
 #include "opt_ddb.h"
@@ -93,7 +93,7 @@ __KERNEL_RCSID(0, "$NetBSD: subr_autoconf.c,v 1.141 2008/03/12 18:02:22 dyoung E
 #include <sys/errno.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
-
+#include <sys/kthread.h>
 #include <sys/buf.h>
 #include <sys/dirent.h>
 #include <sys/vnode.h>
@@ -198,6 +198,7 @@ struct deferred_config_head deferred_config_queue =
 	TAILQ_HEAD_INITIALIZER(deferred_config_queue);
 struct deferred_config_head interrupt_config_queue =
 	TAILQ_HEAD_INITIALIZER(interrupt_config_queue);
+int interrupt_config_threads = 8;
 
 static void config_process_deferred(struct deferred_config_head *, device_t);
 
@@ -384,13 +385,28 @@ config_deferred(device_t dev)
 	config_process_deferred(&interrupt_config_queue, dev);
 }
 
+static void
+config_interrupts_thread(void *cookie)
+{
+	struct deferred_config *dc;
+
+	while ((dc = TAILQ_FIRST(&interrupt_config_queue)) != NULL) {
+		TAILQ_REMOVE(&interrupt_config_queue, dc, dc_queue);
+		(*dc->dc_func)(dc->dc_dev);
+		free(dc, M_DEVBUF);
+		config_pending_decr();
+	}
+	kthread_exit(0);
+}
+
 /*
  * Configure the system's hardware.
  */
 void
 configure(void)
 {
-	int errcnt;
+	extern void ssp_init(void);
+	int i, s;
 
 	/* Initialize data structures. */
 	config_init();
@@ -414,8 +430,8 @@ configure(void)
 	 */
 	cpu_configure();
 
-	/* Initialize callouts, part 2. */
-	callout_startup2();
+	/* Initialize SSP. */
+	ssp_init();
 
 	/*
 	 * Now that we've found all the hardware, start the real time
@@ -424,6 +440,9 @@ configure(void)
 	initclocks();
 
 	cold = 0;	/* clocks are running, we're warm now! */
+	s = splsched();
+	curcpu()->ci_schedstate.spc_flags |= SPCF_RUNNING;
+	splx(s);
 
 	/* Boot the secondary processors. */
 	mp_online = true;
@@ -431,25 +450,24 @@ configure(void)
 	cpu_boot_secondary_processors();
 #endif
 
-	/*
-	 * Now callback to finish configuration for devices which want
-	 * to do this once interrupts are enabled.
-	 */
-	config_process_deferred(&interrupt_config_queue, NULL);
+	/* Setup the runqueues and scheduler. */
+	runq_init();
+	sched_init();
 
-	errcnt = aprint_get_error_count();
-	if ((boothowto & (AB_QUIET|AB_SILENT)) != 0 &&
-	    (boothowto & AB_VERBOSE) == 0) {
-		if (config_do_twiddle) {
-			config_do_twiddle = 0;
-			printf_nolog("done.\n");
-		}
-		if (errcnt != 0) {
-			printf("WARNING: %d error%s while detecting hardware; "
-			    "check system log.\n", errcnt,
-			    errcnt == 1 ? "" : "s");
-		}
+	/*
+	 * Create threads to call back and finish configuration for
+	 * devices that want interrupts enabled.
+	 */
+	for (i = 0; i < interrupt_config_threads; i++) {
+		(void)kthread_create(PRI_NONE, 0, NULL,
+		    config_interrupts_thread, NULL, NULL, "config");
 	}
+
+	/* Get the threads going and into any sleeps before continuing. */
+	yield();
+
+	/* Lock the kernel on behalf of lwp0. */
+	KERNEL_LOCK(1, NULL);
 }
 
 /*
@@ -978,7 +996,7 @@ config_found_sm_loc(device_t parent,
 	if (print) {
 		if (config_do_twiddle)
 			twiddle();
-		aprint_normal("%s", msgs[(*print)(aux, parent->dv_xname)]);
+		aprint_normal("%s", msgs[(*print)(aux, device_xname(parent))]);
 	}
 
 #if defined(SPLASHSCREEN) && defined(SPLASHSCREEN_PROGRESS)
@@ -1076,7 +1094,7 @@ config_devlink(device_t dev)
 	/* put this device in the devices array */
 	config_makeroom(dev->dv_unit, cd);
 	if (cd->cd_devs[dev->dv_unit])
-		panic("config_attach: duplicate %s", dev->dv_xname);
+		panic("config_attach: duplicate %s", device_xname(dev));
 	cd->cd_devs[dev->dv_unit] = dev;
 
 	/* It is safe to add a device to the tail of the list while
@@ -1278,11 +1296,11 @@ config_attach_loc(device_t parent, cfdata_t cf,
 	 * but not silent (in which case, we're twiddling, instead).
 	 */
 	if (parent == ROOT) {
-		aprint_naive("%s (root)", dev->dv_xname);
-		aprint_normal("%s (root)", dev->dv_xname);
+		aprint_naive("%s (root)", device_xname(dev));
+		aprint_normal("%s (root)", device_xname(dev));
 	} else {
-		aprint_naive("%s at %s", dev->dv_xname, parent->dv_xname);
-		aprint_normal("%s at %s", dev->dv_xname, parent->dv_xname);
+		aprint_naive("%s at %s", device_xname(dev), device_xname(parent));
+		aprint_normal("%s at %s", device_xname(dev), device_xname(parent));
 		if (print)
 			(void) (*print)(aux, NULL);
 	}
@@ -1439,7 +1457,7 @@ config_detach(device_t dev, int flags)
 			goto out;
 		else
 			panic("config_detach: forced detach of %s failed (%d)",
-			    dev->dv_xname, rv);
+			    device_xname(dev), rv);
 	}
 
 	/*
@@ -1457,7 +1475,7 @@ config_detach(device_t dev, int flags)
 	    d = TAILQ_NEXT(d, dv_list)) {
 		if (d->dv_parent == dev) {
 			printf("config_detach: detached device %s"
-			    " has children %s\n", dev->dv_xname, d->dv_xname);
+			    " has children %s\n", device_xname(dev), device_xname(d));
 			panic("config_detach");
 		}
 	}
@@ -1709,7 +1727,20 @@ void
 config_finalize(void)
 {
 	struct finalize_hook *f;
-	int rv;
+	struct pdevinit *pdev;
+	extern struct pdevinit pdevinit[];
+	int errcnt, rv;
+
+	/*
+	 * Now that device driver threads have been created, wait for
+	 * them to finish any deferred autoconfiguration.
+	 */
+	while (config_pending)
+		(void) tsleep(&config_pending, PWAIT, "cfpend", hz);
+
+	/* Attach pseudo-devices. */
+	for (pdev = pdevinit; pdev->pdev_attach != NULL; pdev++)
+		(*pdev->pdev_attach)(pdev->pdev_count);
 
 	/* Run the hooks until none of them does any work. */
 	do {
@@ -1724,6 +1755,20 @@ config_finalize(void)
 	while ((f = TAILQ_FIRST(&config_finalize_list)) != NULL) {
 		TAILQ_REMOVE(&config_finalize_list, f, f_list);
 		free(f, M_TEMP);
+	}
+
+	errcnt = aprint_get_error_count();
+	if ((boothowto & (AB_QUIET|AB_SILENT)) != 0 &&
+	    (boothowto & AB_VERBOSE) == 0) {
+		if (config_do_twiddle) {
+			config_do_twiddle = 0;
+			printf_nolog("done.\n");
+		}
+		if (errcnt != 0) {
+			printf("WARNING: %d error%s while detecting hardware; "
+			    "check system log.\n", errcnt,
+			    errcnt == 1 ? "" : "s");
+		}
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: autoconf.c,v 1.15 2008/02/12 17:30:58 joerg Exp $	*/
+/*	$NetBSD: autoconf.c,v 1.18 2008/04/09 01:56:19 nisimura Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.15 2008/02/12 17:30:58 joerg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: autoconf.c,v 1.18 2008/04/09 01:56:19 nisimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,6 +50,7 @@ static struct btinfo_bootpath *bi_path;
 
 #include <dev/cons.h>
 #include <machine/pio.h>
+
 
 /*
  * Determine i/o configuration for a machine.
@@ -88,18 +89,17 @@ device_register(struct device *dev, void *aux)
 	if (bi_rdev == NULL)
 		return; /* no clue to determine */
 
-	if (dev->dv_class == DV_IFNET) {
-		if (device_is_a(dev, bi_rdev->devname)) {
-			struct pci_attach_args *pa = aux;
-			unsigned tag = (unsigned)pa->pa_tag;
+	if (dev->dv_class == DV_IFNET
+	    && device_is_a(dev, bi_rdev->devname)) {
+		struct pci_attach_args *pa = aux;
 
-			if (bi_rdev->cookie == tag)
-				booted_device = dev;
-		}
-		return;
+		if (bi_rdev->cookie == pa->pa_tag)
+			booted_device = dev;
 	}
-	if (dev->dv_class == DV_DISK) {
-		/* XXX add diskboot case later XXX */
+	if (dev->dv_class == DV_DISK
+	    && device_is_a(dev, bi_rdev->devname)) {
+		booted_device = dev;
+		booted_partition = 0;
 	}
 }
 

@@ -1,7 +1,7 @@
-/*	$NetBSD: sched.h,v 1.50 2008/03/17 08:20:05 yamt Exp $	*/
+/*	$NetBSD: sched.h,v 1.55 2008/04/29 14:35:21 rmind Exp $	*/
 
 /*-
- * Copyright (c) 1999, 2000, 2001, 2002, 2007 The NetBSD Foundation, Inc.
+ * Copyright (c) 1999, 2000, 2001, 2002, 2007, 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -16,13 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -159,6 +152,7 @@ struct schedstate_percpu {
 	kmutex_t	*spc_mutex;	/* (: lock on below, runnable LWPs */
 	kmutex_t	*spc_lwplock;	/* (: general purpose lock for LWPs */
 	pri_t		spc_curpriority;/* m: usrpri of curlwp */
+	pri_t		spc_maxpriority;/* m: highest priority queued */
 	psetid_t	spc_psid;	/* (: processor-set ID */
 	time_t		spc_lastmod;	/* c: time of last cpu state change */
 
@@ -176,6 +170,7 @@ struct schedstate_percpu {
 #define	SPCF_SEENRR		0x0001	/* process has seen roundrobin() */
 #define	SPCF_SHOULDYIELD	0x0002	/* process should yield the CPU */
 #define	SPCF_OFFLINE		0x0004	/* CPU marked offline */
+#define	SPCF_RUNNING		0x0008	/* CPU is running */
 
 #define	SPCF_SWITCHCLEAR	(SPCF_SEENRR|SPCF_SHOULDYIELD)
 
@@ -209,10 +204,10 @@ struct cpu_info;
  */
 
 /* Scheduler initialization */
+void		runq_init(void);
 void		sched_init(void);
 void		sched_rqinit(void);
 void		sched_cpuattach(struct cpu_info *);
-void		sched_setup(void);
 
 /* Time-driven events */
 void		sched_tick(struct cpu_info *);
@@ -226,6 +221,8 @@ bool		sched_curcpu_runnable_p(void);
 void		sched_dequeue(struct lwp *);
 void		sched_enqueue(struct lwp *, bool);
 struct lwp *	sched_nextlwp(void);
+void		sched_oncpu(struct lwp *);
+void		sched_newts(struct lwp *);
 
 /* Priority adjustment */
 void		sched_nice(struct proc *, int);
@@ -247,6 +244,7 @@ struct cpu_info *sched_takecpu(struct lwp *);
 void		sched_print_runqueue(void (*pr)(const char *, ...));
 
 /* Dispatching */
+bool		kpreempt(uintptr_t);
 void		preempt(void);
 int		mi_switch(struct lwp *);
 void		resched_cpu(struct lwp *);

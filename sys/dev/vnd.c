@@ -1,4 +1,4 @@
-/*	$NetBSD: vnd.c,v 1.177 2008/03/21 21:54:59 ad Exp $	*/
+/*	$NetBSD: vnd.c,v 1.181 2008/05/05 13:41:30 ad Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2008 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -137,7 +130,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vnd.c,v 1.177 2008/03/21 21:54:59 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vnd.c,v 1.181 2008/05/05 13:41:30 ad Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "fs_nfs.h"
@@ -288,7 +281,7 @@ vnd_attach(device_t parent, device_t self, void *aux)
 	sc->sc_comp_buff = NULL;
 	sc->sc_comp_decombuf = NULL;
 	bufq_alloc(&sc->sc_tab, "disksort", BUFQ_SORT_RAWBLOCK);
-	disk_init(&sc->sc_dkdev, self->dv_xname, NULL);
+	disk_init(&sc->sc_dkdev, device_xname(self), NULL);
 	if (!pmf_device_register(self, NULL, NULL))
 		aprint_error_dev(self, "couldn't establish power handler\n");
 }

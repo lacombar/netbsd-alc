@@ -1,4 +1,4 @@
-/*	$NetBSD: mld6.c,v 1.42 2008/02/27 19:40:56 matt Exp $	*/
+/*	$NetBSD: mld6.c,v 1.45 2008/04/24 11:38:38 ad Exp $	*/
 /*	$KAME: mld6.c,v 1.25 2001/01/16 14:14:18 itojun Exp $	*/
 
 /*
@@ -102,7 +102,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mld6.c,v 1.42 2008/02/27 19:40:56 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mld6.c,v 1.45 2008/04/24 11:38:38 ad Exp $");
 
 #include "opt_inet.h"
 
@@ -110,6 +110,7 @@ __KERNEL_RCSID(0, "$NetBSD: mld6.c,v 1.42 2008/02/27 19:40:56 matt Exp $");
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
@@ -125,6 +126,7 @@ __KERNEL_RCSID(0, "$NetBSD: mld6.c,v 1.42 2008/02/27 19:40:56 matt Exp $");
 #include <netinet6/ip6_var.h>
 #include <netinet6/scope6_var.h>
 #include <netinet/icmp6.h>
+#include <netinet6/icmp6_private.h>
 #include <netinet6/mld6_var.h>
 
 #include <net/net_osdep.h>
@@ -220,7 +222,9 @@ static void
 mld_timeo(void *arg)
 {
 	struct in6_multi *in6m = arg;
-	int s = splsoftnet();
+
+	mutex_enter(softnet_lock);
+	KERNEL_LOCK(1, NULL);
 
 	in6m->in6m_timer = IN6M_TIMER_UNDEF;
 
@@ -233,7 +237,8 @@ mld_timeo(void *arg)
 		break;
 	}
 
-	splx(s);
+	KERNEL_UNLOCK_ONE(NULL);
+	mutex_exit(softnet_lock);
 }
 
 static u_long
@@ -329,7 +334,7 @@ mld_input(struct mbuf *m, int off)
 
 	IP6_EXTHDR_GET(mldh, struct mld_hdr *, m, off, sizeof(*mldh));
 	if (mldh == NULL) {
-		icmp6stat.icp6s_tooshort++;
+		ICMP6_STATINC(ICMP6_STAT_TOOSHORT);
 		return;
 	}
 
@@ -536,7 +541,7 @@ mld_sendpkt(struct in6_multi *in6m, int type,
 	im6o.im6o_multicast_loop = (ip6_mrouter != NULL);
 
 	/* increment output statictics */
-	icmp6stat.icp6s_outhist[type]++;
+	ICMP6_STATINC(ICMP6_STAT_OUTHIST + type);
 	icmp6_ifstat_inc(ifp, ifs6_out_msg);
 	switch (type) {
 	case MLD_LISTENER_QUERY:
@@ -673,7 +678,7 @@ in6_addmulti(struct in6_addr *maddr6, struct ifnet *ifp,
 			return (NULL);
 		}
 
-		callout_init(&in6m->in6m_timer_ch, 0);
+		callout_init(&in6m->in6m_timer_ch, CALLOUT_MPSAFE);
 		callout_setfunc(&in6m->in6m_timer_ch, mld_timeo, in6m);
 		in6m->in6m_timer = timer;
 		if (in6m->in6m_timer > 0) {

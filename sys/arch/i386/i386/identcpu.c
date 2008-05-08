@@ -1,4 +1,4 @@
-/*	$NetBSD: identcpu.c,v 1.88 2008/02/26 18:24:28 xtraeme Exp $	*/
+/*	$NetBSD: identcpu.c,v 1.92 2008/04/28 20:23:24 martin Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001, 2006, 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the NetBSD
- *      Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -37,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.88 2008/02/26 18:24:28 xtraeme Exp $");
+__KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.92 2008/04/28 20:23:24 martin Exp $");
 
 #include "opt_enhanced_speedstep.h"
 #include "opt_intel_odcm.h"
@@ -573,8 +566,7 @@ disable_tsc(struct cpu_info *ci)
 }
 
 void
-cyrix6x86_cpu_setup(ci)
-	struct cpu_info *ci;
+cyrix6x86_cpu_setup(struct cpu_info *ci)
 {
 	/*
 	 * i8254 latch check routine:
@@ -1107,8 +1099,7 @@ transmeta_cpu_info(struct cpu_info *ci)
 	nreg = descs[0];
 	if (nreg >= 0x80860001) {
 		x86_cpuid(0x80860001, descs);
-		aprint_verbose("%s: Processor revision %u.%u.%u.%u\n",
-		    ci->ci_dev->dv_xname,
+		aprint_verbose_dev(ci->ci_dev, "Processor revision %u.%u.%u.%u\n",
 		    (descs[1] >> 24) & 0xff,
 		    (descs[1] >> 16) & 0xff,
 		    (descs[1] >> 8) & 0xff,
@@ -1116,8 +1107,8 @@ transmeta_cpu_info(struct cpu_info *ci)
 	}
 	if (nreg >= 0x80860002) {
 		x86_cpuid(0x80860002, descs);
-		aprint_verbose("%s: Code Morphing Software Rev: %u.%u.%u-%u-%u\n",
-		    ci->ci_dev->dv_xname, (descs[1] >> 24) & 0xff,
+		aprint_verbose_dev(ci->ci_dev, "Code Morphing Software Rev: %u.%u.%u-%u-%u\n",
+		    (descs[1] >> 24) & 0xff,
 		    (descs[1] >> 16) & 0xff,
 		    (descs[1] >> 8) & 0xff,
 		    descs[1] & 0xff,
@@ -1134,15 +1125,14 @@ transmeta_cpu_info(struct cpu_info *ci)
 			x86_cpuid(0x80860003 + i, info.descs[i]);
 		}
 		info.text[64] = '\0';
-		aprint_verbose("%s: %s\n", ci->ci_dev->dv_xname, info.text);
+		aprint_verbose_dev(ci->ci_dev, "%s\n", info.text);
 	}
 
 	if (nreg >= 0x80860007) {
 		longrun = tmx86_get_longrun_mode();
 		tmx86_get_longrun_status(&frequency,
 		    &voltage, &percentage);
-		aprint_verbose("%s: LongRun mode: %d  <%dMHz %dmV %d%%>\n",
-		    ci->ci_dev->dv_xname,
+		aprint_verbose_dev(ci->ci_dev, "LongRun mode: %d  <%dMHz %dmV %d%%>\n",
 		    longrun, frequency, voltage, percentage);
 	}
 }
@@ -1165,7 +1155,7 @@ identifycpu(struct cpu_info *ci)
 	int modif, family, model;
 	const struct cpu_cpuid_nameclass *cpup = NULL;
 	const struct cpu_cpuid_family *cpufam;
-	char *cpuname = ci->ci_dev->dv_xname;
+	const char *cpuname = device_xname(ci->ci_dev);
 	char *buf;
 	const char *feature_str[3];
 
@@ -1428,7 +1418,7 @@ identifycpu(struct cpu_info *ci)
 		if (rdmsr(MSR_MISC_ENABLE) & (1 << 16))
 			est_init(cpu_vendor);
 		else
-			aprint_normal("%s: Enhanced SpeedStep disabled by BIOS\n",
+			aprint_verbose("%s: Enhanced SpeedStep disabled by BIOS\n",
 			    cpuname);
 	}
 #endif /* ENHANCED_SPEEDSTEP */

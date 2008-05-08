@@ -1,4 +1,4 @@
-/* $NetBSD: pcn.c,v 1.9 2007/11/12 14:03:35 nisimura Exp $ */
+/* $NetBSD: pcn.c,v 1.11 2008/04/28 20:23:34 martin Exp $ */
 
 /*-
  * Copyright (c) 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -153,10 +146,10 @@ pcn_init(unsigned tag, void *data)
 	struct pcninit initblock, *ib;
 
 	val = pcicfgread(tag, PCI_ID_REG);
-	if (PCI_VENDOR(val) != 0x1022 && PCI_PRODUCT(val) != 0x2000)
+	if (PCI_DEVICE(0x1022, 0x2000) != val)
 		return NULL;
 
-	l = ALLOC(struct local, sizeof(struct desc));
+	l = ALLOC(struct local, sizeof(struct desc)); /* desc alignment */
 	memset(l, 0, sizeof(struct local));
 	l->csr = DEVTOV(pcicfgread(tag, 0x14)); /* use mem space */
 

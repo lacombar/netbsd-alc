@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.932 2008/03/26 11:13:30 jmcneill Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.938 2008/04/30 12:23:56 joerg Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.932 2008/03/26 11:12:43 jmcneill Exp
+ *	NetBSD: pcidevs,v 1.938 2008/04/30 12:23:29 joerg Exp
  */
 
 /*
@@ -2320,6 +2320,10 @@ static const struct pci_vendor pci_vendors[] = {
 	    "NetPower (2nd PCI Vendor ID)",
 	},
 	{
+	    PCI_VENDOR_XENSOURCE,
+	    "XenSource, Inc.",
+	},
+	{
 	    PCI_VENDOR_C4T,
 	    "c't Magazin",
 	},
@@ -2392,7 +2396,7 @@ static const struct pci_vendor pci_vendors[] = {
 	    "INVALID VENDOR ID",
 	},
 };
-const int pci_nvendors = 588;
+const int pci_nvendors = 589;
 
 static const struct pci_product pci_products[] = {
 	{
@@ -2678,6 +2682,14 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_3WARE, PCI_PRODUCT_3WARE_9550,
 	    "9550-series RAID",
+	},
+	{
+	    PCI_VENDOR_3WARE, PCI_PRODUCT_3WARE_9650,
+	    "9650-series RAID",
+	},
+	{
+	    PCI_VENDOR_3WARE, PCI_PRODUCT_3WARE_9690,
+	    "9690-series RAID",
 	},
 	{
 	    PCI_VENDOR_ABOCOM, PCI_PRODUCT_ABOCOM_FE2500,
@@ -5240,6 +5252,10 @@ static const struct pci_product pci_products[] = {
 	    "BCM43XG",
 	},
 	{
+	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4328,
+	    "BCM4328 802.11a/b/g/n",
+	},
+	{
 	    PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4401,
 	    "BCM4401 10/100 Ethernet",
 	},
@@ -6114,6 +6130,14 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_DIAMOND, PCI_PRODUCT_DIAMOND_VIPER,
 	    "Viper/PCI",
+	},
+	{
+	    PCI_VENDOR_DIGI, PCI_PRODUCT_DIGI_NEO4,
+	    "Neo 4-port",
+	},
+	{
+	    PCI_VENDOR_DIGI, PCI_PRODUCT_DIGI_NEO8,
+	    "Neo 8-port",
 	},
 	{
 	    PCI_VENDOR_DLINK, PCI_PRODUCT_DLINK_DL1002,
@@ -10888,8 +10912,24 @@ static const struct pci_product pci_products[] = {
 	    "nForce MCP61 Gigabit Ethernet Controller",
 	},
 	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_GF_8400M_GS,
+	    "GeForce 8400M GS",
+	},
+	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_ISA,
 	    "nForce MCP65 PCI-ISA Bridge",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_LPC1,
+	    "nForce MCP65 PCI-LPC Bridge",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_LPC2,
+	    "nForce MCP65 PCI-LPC Bridge",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_LPC3,
+	    "nForce MCP65 PCI-LPC Bridge",
 	},
 	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_MEM,
@@ -10902,6 +10942,10 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_SMB,
 	    "nForce MCP65 SMBus Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_SMU,
+	    "nForce MCP65 System Management Unit",
 	},
 	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_IDE,
@@ -11084,6 +11128,22 @@ static const struct pci_product pci_products[] = {
 	    "nForce MCP77 ATA133 IDE Controller",
 	},
 	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP77_LAN1,
+	    "nForce MCP77 Gigabit Ethernet Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP77_LAN2,
+	    "nForce MCP77 Gigabit Ethernet Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP77_LAN3,
+	    "nForce MCP77 Gigabit Ethernet Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP77_LAN4,
+	    "nForce MCP77 Gigabit Ethernet Controller",
+	},
+	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP77_HDA_1,
 	    "nForce MCP77 High Definition Audio Controller",
 	},
@@ -11174,6 +11234,22 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP73_HDA_2,
 	    "nForce MCP73 High Definition Audio Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP79_LAN1,
+	    "nForce MCP79 Gigabit Ethernet Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP79_LAN2,
+	    "nForce MCP79 Gigabit Ethernet Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP79_LAN3,
+	    "nForce MCP79 Gigabit Ethernet Controller",
+	},
+	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP79_LAN4,
+	    "nForce MCP79 Gigabit Ethernet Controller",
 	},
 	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP77_AHCI_1,
@@ -11702,6 +11778,10 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_RICOH, PCI_PRODUCT_RICOH_Rx5C847,
 	    "5C847 PCI-CardBus bridge/SD/MMC/MMC+/MS/xD/Firewire",
+	},
+	{
+	    PCI_VENDOR_RICOH, PCI_PRODUCT_RICOH_RxDPCC,
+	    "xD-Picture Card Controller",
 	},
 	{
 	    PCI_VENDOR_RICOH, PCI_PRODUCT_RICOH_Rx5C853,
@@ -14048,6 +14128,10 @@ static const struct pci_product pci_products[] = {
 	    "NPATA-32 IDE (KME)",
 	},
 	{
+	    PCI_VENDOR_XENSOURCE, PCI_PRODUCT_XENSOURCE_XENPLATFORM,
+	    "Xen Platform Device",
+	},
+	{
 	    PCI_VENDOR_XIRCOM, PCI_PRODUCT_XIRCOM_X3201_3,
 	    "X3201-3 Fast Ethernet Controller",
 	},
@@ -14100,4 +14184,4 @@ static const struct pci_product pci_products[] = {
 	    "Video Controller",
 	},
 };
-const int pci_nproducts = 2926;
+const int pci_nproducts = 2946;

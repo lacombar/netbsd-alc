@@ -1,4 +1,4 @@
-/*	$NetBSD: umidi.c,v 1.34 2008/02/18 05:24:24 dyoung Exp $	*/
+/*	$NetBSD: umidi.c,v 1.36 2008/04/28 20:24:00 martin Exp $	*/
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	  This product includes software developed by the NetBSD
- *	  Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -37,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umidi.c,v 1.34 2008/02/18 05:24:24 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umidi.c,v 1.36 2008/04/28 20:24:00 martin Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1291,7 +1284,7 @@ describe_mididev(struct umidi_mididev *md)
 {
 	char in_label[16];
 	char out_label[16];
-	char *unit_label;
+	const char *unit_label;
 	char *final_label;
 	struct umidi_softc *sc;
 	int show_ep_in;

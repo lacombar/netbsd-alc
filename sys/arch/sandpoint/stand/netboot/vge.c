@@ -1,4 +1,4 @@
-/* $NetBSD: vge.c,v 1.10 2007/12/09 09:55:58 nisimura Exp $ */
+/* $NetBSD: vge.c,v 1.13 2008/04/28 20:23:34 martin Exp $ */
 
 /*-
  * Copyright (c) 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -222,7 +215,7 @@ vge_init(unsigned tag, void *data)
 	uint8_t *en;
 
 	val = pcicfgread(tag, PCI_ID_REG);
-	if (PCI_VENDOR(val) != 0x1106 && PCI_PRODUCT(val) != 0x3119)
+	if (PCI_DEVICE(0x1106, 0x3119) != val)
 		return NULL;
 
 	l = ALLOC(struct local, 64);   /* desc alignment */
@@ -320,10 +313,10 @@ vge_send(void *dev, char *buf, unsigned len)
 	struct tdesc *txd;
 	unsigned loop;
 	
-	wbinv(buf, len);
 	len = (len & T_FLMASK);
 	if (len < 60)
 		len = 60; /* needs to stretch to ETHER_MIN_LEN - 4 */
+	wbinv(buf, len);
 	txd = &l->txd;
 	txd->tf[0].lo = htole32(VTOPHYS(buf));
 	txd->tf[0].hi = htole32(len << 16);

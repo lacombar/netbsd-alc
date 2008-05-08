@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.45 2008/02/27 18:26:15 xtraeme Exp $	*/
+/*	$NetBSD: cpu.h,v 1.51 2008/04/30 12:44:27 ad Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -57,12 +57,17 @@
 #include <sys/simplelock.h>
 #include <sys/cpu_data.h>
 #include <sys/cc_microtime.h>
+#include <sys/systm.h>
 
 struct pmap;
 
 struct cpu_info {
 	struct device *ci_dev;
 	struct cpu_info *ci_self;
+
+#ifdef XEN
+	volatile struct vcpu_info *ci_vcpu;
+#endif
 
 	/*
 	 * Will be accessed by other CPUs.
@@ -80,11 +85,11 @@ struct cpu_info {
 	uint8_t ci_coreid;
 	uint8_t ci_smtid;
 	struct cpu_data ci_data;	/* MI per-cpu data */
-	struct cc_microtime_state ci_cc;/* cc_microtime state */
 
 	/*
 	 * Private members.
 	 */
+	struct cc_microtime_state ci_cc __aligned(64);/* cc_microtime state */
 	struct evcnt ci_tlb_evcnt;	/* tlb shootdown counter */
 	struct pmap *ci_pmap;		/* current pmap */
 	int ci_need_tlbwait;		/* need to wait for TLB invalidations */
@@ -93,7 +98,7 @@ struct cpu_info {
 #define	TLBSTATE_VALID	0	/* all user tlbs are valid */
 #define	TLBSTATE_LAZY	1	/* tlbs are valid but won't be kept uptodate */
 #define	TLBSTATE_STALE	2	/* we might have stale user tlbs */
-	u_int64_t ci_scratch;
+	uint64_t ci_scratch;
 #ifdef XEN
 	struct iplsource *ci_isources[NIPL];
 #else
@@ -112,25 +117,24 @@ struct cpu_info {
 
 	int		ci_idepth;
 	void *		ci_intrstack;
-	u_int32_t	ci_imask[NIPL];
-	u_int32_t	ci_iunmask[NIPL];
+	uint32_t	ci_imask[NIPL];
+	uint32_t	ci_iunmask[NIPL];
 
 	u_int		ci_flags;
-	u_int32_t	ci_ipis;
+	uint32_t	ci_ipis;
 
 	int32_t		ci_cpuid_level;
 	uint32_t	ci_signature;
 	uint32_t	ci_feature_flags;
 	uint32_t	ci_feature2_flags;
 	uint32_t	ci_vendor[4];	 /* vendor string */
-	u_int64_t	ci_tsc_freq;
+	uint64_t	ci_tsc_freq;
 	volatile uint32_t	ci_lapic_counter;
 
 	const struct cpu_functions *ci_func;
 	void (*cpu_setup)(struct cpu_info *);
 	void (*ci_info)(struct cpu_info *);
 
-	int		ci_want_resched;
 	struct trapframe *ci_ddb_regs;
 
 	struct x86_cache_info ci_cinfo[CAI_COUNT];
@@ -173,6 +177,10 @@ struct cpu_info {
 	uint64_t	ci_suspend_cr3;
 	uint64_t	ci_suspend_cr4;
 	uint64_t	ci_suspend_cr8;
+
+	/* The following must be in a single cache line. */
+	int		ci_want_resched __aligned(64);
+	int		ci_padout __aligned(64);
 };
 
 #define CPUF_BSP	0x0001		/* CPU is the original BSP */
@@ -199,7 +207,7 @@ extern struct cpu_info *cpu_info_list;
 #define CPU_STOP(_ci)			((_ci)->ci_func->stop(_ci))
 #define CPU_START_CLEANUP(_ci)		((_ci)->ci_func->cleanup(_ci))
 
-#if defined(__GNUC__) && defined(_KERNEL)
+#if defined(__GNUC__) && !defined(_LKM)
 static struct cpu_info *x86_curcpu(void);
 static lwp_t *x86_curlwp(void);
 
@@ -226,11 +234,23 @@ x86_curlwp(void)
 	    (*(struct cpu_info * const *)offsetof(struct cpu_info, ci_curlwp)));
 	return l;
 }
-#else	/* __GNUC__ && _KERNEL */
+
+__inline static void __unused
+cpu_set_curpri(int pri)
+{
+
+	__asm volatile(
+	    "movl %1, %%gs:%0" :
+	    "=m" (*(struct cpu_info *)offsetof(struct cpu_info, ci_schedstate.spc_curpriority)) :
+	    "r" (pri)
+	);
+}
+#else	/* __GNUC__ && !_LKM */
 /* For non-GCC and LKMs */
 struct cpu_info	*x86_curcpu(void);
 lwp_t	*x86_curlwp(void);
-#endif	/* __GNUC__ && _KERNEL */
+void	cpu_set_curpri(int);
+#endif	/* __GNUC__ && !_LKM */
 
 #define cpu_number()	(curcpu()->ci_cpuid)
 
@@ -241,9 +261,13 @@ extern struct cpu_info *cpu_info[X86_MAXPROCS];
 void cpu_boot_secondary_processors(void);
 void cpu_init_idle_lwps(void);    
 
-#define aston(l)	((l)->l_md.md_astpending = 1)
+#define	X86_AST_GENERIC		0x01
+#define	X86_AST_PREEMPT		0x02
 
-extern u_int32_t cpus_attached;
+#define aston(l, why)		((l)->l_md.md_astpending |= (why))
+#define	cpu_did_resched(l)	((l)->l_md.md_astpending &= ~X86_AST_PREEMPT)
+
+extern uint32_t cpus_attached;
 
 #define curcpu()	x86_curcpu()
 #define curlwp		x86_curlwp()
@@ -385,7 +409,7 @@ struct disklist {
 		int bi_cyl;			   /* cylinders on disk */
 		int bi_head;			   /* heads per track */
 		int bi_sec;			   /* sectors per track */
-		u_int64_t bi_lbasecs;		   /* total sec. (iff ext13) */
+		uint64_t bi_lbasecs;		   /* total sec. (iff ext13) */
 #define BIFLAG_INVALID		0x01
 #define BIFLAG_EXTINT13		0x02
 		int bi_flags;

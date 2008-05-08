@@ -1,4 +1,4 @@
-/*	$NetBSD: i386func.S,v 1.8 2008/03/27 13:00:25 ad Exp $	*/
+/*	$NetBSD: i386func.S,v 1.11 2008/05/03 06:11:19 yamt Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2007, 2008 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -43,7 +36,7 @@
  */
 
 #include <machine/asm.h>
-__KERNEL_RCSID(0, "$NetBSD: i386func.S,v 1.8 2008/03/27 13:00:25 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i386func.S,v 1.11 2008/05/03 06:11:19 yamt Exp $");
 
 #include <machine/specialreg.h>
 #include <machine/segments.h>
@@ -54,30 +47,36 @@ ENTRY(invlpg)
 	movl	4(%esp), %eax
 	invlpg	(%eax)
 	ret
+END(invlpg)
 
 ENTRY(lldt)
 	movl	4(%esp), %eax
 	lldt	%ax
 	ret
+END(lldt)
 
 ENTRY(ltr)
 	movl	4(%esp), %eax
 	ltr	%ax
 	ret
+END(ltr)
 
 ENTRY(lcr0)
 	movl	4(%esp), %eax
 	movl	%eax, %cr0
 	ret
+END(lcr0)
 
 ENTRY(rcr0)
 	movl	%cr0, %eax
 	ret
+END(rcr0)
 
 ENTRY(lcr3)
 	movl	4(%esp), %eax
 	movl	%eax, %cr3
 	ret
+END(lcr3)
 
 /*
  * Big hammer: flush all TLB entries, including ones from PTE's
@@ -107,37 +106,51 @@ ENTRY(tlbflushg)
 	movl	%edx, %cr4
 	movl	%eax, %cr4
 	ret
+END(tlbflushg)
 
 ENTRY(tlbflush)
 1:
 	movl	%cr3, %eax
 	movl	%eax, %cr3
 	ret
+END(tlbflush)
 
 ENTRY(ldr6)
 	movl	4(%esp), %eax
 	movl	%eax, %dr6
 	ret
+END(ldr6)
 
 ENTRY(rdr6)
 	movl	%dr6, %eax
 	ret
+END(rdr6)
 
 ENTRY(rcr2)
 	movl	%cr2, %eax
 	ret
+END(rcr2)
+
+ENTRY(lcr2)
+	movl	4(%esp), %eax
+	movl	%eax, %cr2
+	ret
+END(lcr2)
 
 ENTRY(wbinvd)
 	wbinvd
 	ret
+END(wbinvd)
 
 NENTRY(x86_disable_intr)
 	cli
 	ret
+END(x86_disable_intr)
 
 NENTRY(x86_enable_intr)
 	sti
 	ret
+END(x86_enable_intr)
 
 /*
  * void lgdt(struct region_descriptor *rdp);
@@ -164,6 +177,7 @@ ENTRY(lgdt)
 	movl	$GSEL(GCPU_SEL, SEL_KPL), %eax
 	movl	%eax, %fs
 	jmp	_C_LABEL(x86_flush)
+END(lgdt)
 
 ENTRY(tsc_get_timecount)
 	jmp	_C_LABEL(tsc_slow_timecount)
@@ -197,3 +211,4 @@ ENTRY(tsc_get_timecount)
 	jmp	_C_LABEL(tsc_slow_timecount)
 3:
 	jmp	1b
+END(tsc_get_timecount)

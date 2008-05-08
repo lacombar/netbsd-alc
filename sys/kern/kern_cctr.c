@@ -1,8 +1,7 @@
-/* $NetBSD: kern_cctr.c,v 1.4 2008/03/10 22:20:14 martin Exp $ */
-
+/*	$NetBSD: kern_cctr.c,v 1.7 2008/04/28 20:24:02 martin Exp $	*/
 
 /*-
- * Copyright (c) 2006 The NetBSD Foundation, Inc.
+ * Copyright (c) 2006, 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * re-implementation of TSC for MP systems merging cc_microtime and
@@ -16,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -83,7 +75,7 @@
 
 #include <sys/cdefs.h>
 /* __FBSDID("$FreeBSD: src/sys/i386/i386/tsc.c,v 1.204 2003/10/21 18:28:34 silby Exp $"); */
-__KERNEL_RCSID(0, "$NetBSD: kern_cctr.c,v 1.4 2008/03/10 22:20:14 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_cctr.c,v 1.7 2008/04/28 20:24:02 martin Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -99,7 +91,6 @@ __KERNEL_RCSID(0, "$NetBSD: kern_cctr.c,v 1.4 2008/03/10 22:20:14 martin Exp $")
 
 /* XXX make cc_timecounter.tc_frequency settable by sysctl() */
 
-static timecounter_get_t cc_get_timecount;
 static timecounter_pps_t cc_calibrate;
 
 void cc_calibrate_cpu(struct cpu_info *);
@@ -126,8 +117,11 @@ static struct timecounter cc_timecounter = {
  * initialize cycle counter based timecounter
  */
 struct timecounter *
-cc_init(uint64_t freq, const char *name, int quality)
+cc_init(timecounter_get_t getcc, uint64_t freq, const char *name, int quality)
 {
+
+	if (getcc != NULL)
+		cc_timecounter.tc_get_timecount = getcc;
 
 	cc_timecounter.tc_frequency = freq;
 	cc_timecounter.tc_name = name;
@@ -140,13 +134,17 @@ cc_init(uint64_t freq, const char *name, int quality)
 /*
  * pick up tick count scaled to reference tick count
  */
-static u_int
+u_int
 cc_get_timecount(struct timecounter *tc)
 {
-	struct cpu_info *ci = curcpu();
-	int64_t rcc, cc;
+	struct cpu_info *ci;
+	int64_t rcc, cc, ncsw;
 	u_int gen;
 
+ retry:
+ 	ncsw = curlwp->l_ncsw;
+ 	__insn_barrier();
+	ci = curcpu();
 	if (ci->ci_cc.cc_denom == 0) {
 		/*
 		 * This is our first time here on this CPU.  Just
@@ -180,6 +178,11 @@ cc_get_timecount(struct timecounter *tc)
 		rcc = (cc * ci->ci_cc.cc_delta) / ci->ci_cc.cc_denom
 		    + ci->ci_cc.cc_val;
 	} while (gen == 0 || gen != ci->ci_cc.cc_gen);
+ 	__insn_barrier();
+ 	if (ncsw != curlwp->l_ncsw) {
+ 		/* Was preempted */ 
+ 		goto retry;
+	}
 
 	return rcc;
 }
@@ -197,7 +200,9 @@ cc_calibrate(struct timecounter *tc)
 {
 	static int calls;
 	struct cpu_info *ci;
-	
+
+	KASSERT(kpreempt_disabled());
+
 	 /*
 	  * XXX: for high interrupt frequency
 	  * support: ++calls < hz / tc_tick

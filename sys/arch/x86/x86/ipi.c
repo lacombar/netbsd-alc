@@ -1,7 +1,7 @@
-/*	$NetBSD: ipi.c,v 1.8 2007/11/28 16:28:44 ad Exp $	*/
+/*	$NetBSD: ipi.c,v 1.11 2008/04/28 20:23:40 martin Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -17,13 +17,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -39,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ipi.c,v 1.8 2007/11/28 16:28:44 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ipi.c,v 1.11 2008/04/28 20:23:40 martin Exp $");
 
 #include <sys/param.h> 
 #include <sys/device.h>
@@ -52,6 +45,7 @@ __KERNEL_RCSID(0, "$NetBSD: ipi.c,v 1.8 2007/11/28 16:28:44 ad Exp $");
 #include <machine/i82489reg.h>
 #include <machine/i82489var.h>
 
+#ifdef MULTIPROCESSOR
 int
 x86_send_ipi(struct cpu_info *ci, int ipimask)
 {
@@ -67,15 +61,15 @@ x86_send_ipi(struct cpu_info *ci, int ipimask)
 	if (ret != 0) {
 		printf("ipi of %x from %s to %s failed\n",
 		    ipimask,
-		    curcpu()->ci_dev->dv_xname,
-		    ci->ci_dev->dv_xname);
+		    device_xname(curcpu()->ci_dev),
+		    device_xname(ci->ci_dev));
 	}
 
 	return ret;
 }
 
 void
-x86_broadcast_ipi (int ipimask)
+x86_broadcast_ipi(int ipimask)
 {
 	struct cpu_info *ci, *self = curcpu();
 	int count = 0;
@@ -116,7 +110,7 @@ void
 x86_ipi_handler(void)
 {
 	struct cpu_info *ci = curcpu();
-	u_int32_t pending;
+	uint32_t pending;
 	int bit;
 
 	pending = atomic_swap_32(&ci->ci_ipis, 0);
@@ -129,3 +123,23 @@ x86_ipi_handler(void)
 		(*ipifunc[bit])(ci);
 	}
 }
+#else
+int
+x86_send_ipi(struct cpu_info *ci, int ipimask)
+{
+
+	return 0;
+}
+
+void
+x86_broadcast_ipi(int ipimask)
+{
+
+}
+
+void
+x86_multicast_ipi(int cpumask, int ipimask)
+{
+
+}
+#endif

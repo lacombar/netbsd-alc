@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.165 2008/02/27 20:18:56 xtraeme Exp $	*/
+/*	$NetBSD: cpu.h,v 1.169 2008/04/30 12:44:27 ad Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -74,6 +74,11 @@ struct pmap;
 struct cpu_info {
 	struct device *ci_dev;		/* pointer to our device */
 	struct cpu_info *ci_self;	/* self-pointer */
+
+#ifdef XEN
+	volatile struct vcpu_info *ci_vcpu;
+#endif
+
 	void	*ci_tlog_base;		/* Trap log base */
 	int32_t ci_tlog_offset;		/* Trap log current offset */
 
@@ -82,7 +87,7 @@ struct cpu_info {
 	 */
 	struct cpu_info *ci_next;	/* next cpu */
 	struct lwp *ci_curlwp;		/* current owner of the processor */
-	int		ci_want_resched;
+	int		ci_fpused;	/* XEN: FPU was used by curlwp */
 	struct pmap_cpu *ci_pmap_cpu;	/* per-CPU pmap data */
 	struct lwp *ci_fpcurlwp;	/* current owner of the FPU */
 	int	ci_fpsaving;		/* save in progress */
@@ -195,9 +200,10 @@ struct cpu_info {
 	uint32_t	ci_suspend_cr2;
 	uint32_t	ci_suspend_cr3;
 	uint32_t	ci_suspend_cr4;
-#ifdef XEN
-	int		ci_fpused;	/* FPU was used by curlwp */
-#endif
+
+	/* The following must be in a single cache line. */
+	int		ci_want_resched __aligned(64);
+	int		ci_padout __aligned(64);
 };
 
 /*
@@ -238,7 +244,7 @@ extern struct cpu_info *cpu_info_list;
 #define CPU_STOP(_ci)	        	((_ci)->ci_func->stop(_ci))
 #define CPU_START_CLEANUP(_ci)		((_ci)->ci_func->cleanup(_ci))
 
-#if defined(__GNUC__) && defined(_KERNEL)
+#if defined(__GNUC__) && !defined(_LKM)
 static struct cpu_info *x86_curcpu(void);
 static lwp_t *x86_curlwp(void);
 
@@ -265,17 +271,32 @@ x86_curlwp(void)
 	    (*(struct cpu_info * const *)offsetof(struct cpu_info, ci_curlwp)));
 	return l;
 }
-#else	/* __GNUC__ && _KERNEL */
+__inline static void __unused
+cpu_set_curpri(int pri)
+{
+
+	__asm volatile(
+	    "movl %1, %%fs:%0" :
+	    "=m" (*(struct cpu_info *)offsetof(struct cpu_info, ci_schedstate.spc_curpriority)) :
+	    "r" (pri)
+	);
+}
+#else	/* __GNUC__ && !_LKM */
 /* For non-GCC and LKMs */
 struct cpu_info	*x86_curcpu(void);
 lwp_t	*x86_curlwp(void);
-#endif	/* __GNUC__ && _KERNEL */
+void	cpu_set_curpri(int);
+#endif	/* __GNUC__ && !_LKM */
 
 #define cpu_number() 		(curcpu()->ci_cpuid)
 
 #define CPU_IS_PRIMARY(ci)	((ci)->ci_flags & CPUF_PRIMARY)
 
-#define aston(l)		((l)->l_md.md_astpending = 1)
+#define	X86_AST_GENERIC		0x01
+#define	X86_AST_PREEMPT		0x02
+
+#define aston(l, why)		((l)->l_md.md_astpending |= (why))
+#define	cpu_did_resched(l)	((l)->l_md.md_astpending &= ~X86_AST_PREEMPT)
 
 extern	struct cpu_info *cpu_info[X86_MAXPROCS];
 

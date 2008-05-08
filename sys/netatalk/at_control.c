@@ -1,4 +1,4 @@
-/*	$NetBSD: at_control.c,v 1.24 2007/12/06 00:28:37 dyoung Exp $	 */
+/*	$NetBSD: at_control.c,v 1.26 2008/04/30 00:25:17 ad Exp $	 */
 
 /*
  * Copyright (c) 1990,1994 Regents of The University of Michigan.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: at_control.c,v 1.24 2007/12/06 00:28:37 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: at_control.c,v 1.26 2008/04/30 00:25:17 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

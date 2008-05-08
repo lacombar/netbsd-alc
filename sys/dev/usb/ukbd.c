@@ -1,4 +1,4 @@
-/*      $NetBSD: ukbd.c,v 1.97 2008/02/18 05:24:24 dyoung Exp $        */
+/*      $NetBSD: ukbd.c,v 1.99 2008/04/28 20:23:59 martin Exp $        */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -16,13 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -42,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ukbd.c,v 1.97 2008/02/18 05:24:24 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ukbd.c,v 1.99 2008/04/28 20:23:59 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -320,8 +313,9 @@ ukbd_attach(device_t parent, device_t self, void *aux)
 
 	parseerr = ukbd_parse_desc(sc);
 	if (parseerr != NULL) {
-		printf("\n%s: attach failed, %s\n",
-		       sc->sc_hdev.sc_dev.dv_xname, parseerr);
+		aprint_normal("\n");
+		aprint_error_dev(&sc->sc_hdev.sc_dev, "attach failed, %s\n",
+		       parseerr);
 		USB_ATTACH_ERROR_RETURN;
 	}
 

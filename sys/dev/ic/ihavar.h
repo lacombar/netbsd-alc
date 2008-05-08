@@ -1,4 +1,4 @@
-/*	$NetBSD: ihavar.h,v 1.10 2005/12/11 12:21:27 christos Exp $ */
+/*	$NetBSD: ihavar.h,v 1.12 2008/05/03 05:21:25 tsutsui Exp $ */
 
 /*-
  * Device driver for the INI-9XXXU/UW or INIC-940/950 PCI SCSI Controller.
@@ -34,7 +34,7 @@
  */
 
 /*
- * Ported to NetBSD by Izumi Tsutsui <tsutsui@ceres.dti.ne.jp> from OpenBSD:
+ * Ported to NetBSD by Izumi Tsutsui <tsutsui@NetBSD.org> from OpenBSD:
  * $OpenBSD: iha.h,v 1.2 2001/02/08 17:35:05 krw Exp $
  */
 
@@ -138,7 +138,7 @@ struct tcs {
 };
 
 struct iha_softc {
-	struct device sc_dev;
+	device_t sc_dev;
 
 	bus_space_tag_t sc_iot;
 	bus_space_handle_t sc_ioh;

@@ -1,4 +1,4 @@
-/*	$NetBSD: misc_stub.c,v 1.7 2008/02/27 17:02:56 ad Exp $	*/
+/*	$NetBSD: misc_stub.c,v 1.9 2008/05/04 12:52:58 ad Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -32,8 +32,8 @@
 #include <sys/sched.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
-#include <sys/module.h>
 #include <sys/cpu.h>
+#include <sys/evcnt.h>
 
 #ifdef __sparc__
  /* 
@@ -107,16 +107,17 @@ sysctl_unlock(void)
 
 }
 
-void
-module_init_class(modclass_t mc)
-{
-
-}
-
 struct cpu_info *
 cpu_lookup_byindex(u_int index)
 {
 	extern struct cpu_info rump_cpu;
 
 	return &rump_cpu;
+}
+
+void
+evcnt_attach_dynamic(struct evcnt *ev, int type, const struct evcnt *parent,
+    const char *group, const char *name)
+{
+
 }

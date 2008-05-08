@@ -1,7 +1,7 @@
-#	$NetBSD: genassym.cf,v 1.26 2008/03/26 12:36:33 ad Exp $
+#	$NetBSD: genassym.cf,v 1.30 2008/04/28 22:47:37 ad Exp $
 
 #
-# Copyright (c) 1998, 2006, 2007 The NetBSD Foundation, Inc.
+# Copyright (c) 1998, 2006, 2007, 2008 The NetBSD Foundation, Inc.
 # All rights reserved.
 #
 # This code is derived from software contributed to The NetBSD Foundation
@@ -15,13 +15,6 @@
 # 2. Redistributions in binary form must reproduce the above copyright
 #    notice, this list of conditions and the following disclaimer in the
 #    documentation and/or other materials provided with the distribution.
-# 3. All advertising materials mentioning features or use of this software
-#    must display the following acknowledgement:
-#        This product includes software developed by the NetBSD
-#        Foundation, Inc. and its contributors.
-# 4. Neither the name of The NetBSD Foundation nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
 #
 # THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
 # ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -170,6 +163,8 @@ define	L_FLAG			offsetof(struct lwp, l_flag)
 define	L_PROC			offsetof(struct lwp, l_proc)
 define	L_CTXSWTCH		offsetof(struct lwp, l_ctxswtch)
 define	L_NCSW			offsetof(struct lwp, l_ncsw)
+define	L_NOPREEMPT		offsetof(struct lwp, l_nopreempt)
+define	L_DOPREEMPT		offsetof(struct lwp, l_dopreempt)
 define	L_CPU			offsetof(struct lwp, l_cpu)
 define	L_MD_REGS		offsetof(struct lwp, l_md.md_regs)
 define	L_MD_FLAGS		offsetof(struct lwp, l_md.md_flags)
@@ -253,6 +248,7 @@ define	CPU_INFO_CPUMASK	offsetof(struct cpu_info, ci_cpumask)
 define	CPU_INFO_RSP0		offsetof(struct cpu_info, ci_tss.tss_rsp0)
 define	CPU_INFO_CC		offsetof(struct cpu_info, ci_cc)
 define	CPU_INFO_NSYSCALL	offsetof(struct cpu_info, ci_data.cpu_nsyscall)
+define	CPU_INFO_CURPRIORITY	offsetof(struct cpu_info, ci_schedstate.spc_curpriority)
 
 define	CPU_INFO_GDT		offsetof(struct cpu_info, ci_gdt)
 define	CPU_INFO_IPENDING	offsetof(struct cpu_info, ci_ipending)
@@ -347,6 +343,7 @@ define	IS_LWP			offsetof(struct intrsource, is_lwp)
 endif
 
 define	IPL_NONE		IPL_NONE
+define	IPL_PREEMPT		IPL_PREEMPT
 define	IPL_CLOCK		IPL_CLOCK
 define	IPL_HIGH		IPL_HIGH
 define	IPL_IPI			IPL_IPI
@@ -391,6 +388,7 @@ define	OPTERON_MSR_PASSCODE	OPTERON_MSR_PASSCODE
 define	X86_BUS_SPACE_IO	X86_BUS_SPACE_IO
 
 ifdef XEN
+define CPU_INFO_VCPU		offsetof(struct cpu_info, ci_vcpu)
 define EVTCHN_UPCALL_MASK	offsetof(struct vcpu_info, evtchn_upcall_mask)
 define XEN_PT_BASE		offsetof(struct start_info, pt_base)    
 define XEN_NR_PT_FRAMES		offsetof(struct start_info, nr_pt_frames)

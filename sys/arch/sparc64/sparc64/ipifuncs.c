@@ -1,4 +1,4 @@
-/*	$NetBSD: ipifuncs.c,v 1.19 2008/03/27 15:20:47 martin Exp $ */
+/*	$NetBSD: ipifuncs.c,v 1.21 2008/04/28 20:23:37 martin Exp $ */
 
 /*-
  * Copyright (c) 2004 The NetBSD Foundation, Inc.
@@ -12,13 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -34,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ipifuncs.c,v 1.19 2008/03/27 15:20:47 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ipifuncs.c,v 1.21 2008/04/28 20:23:37 martin Exp $");
 
 #include "opt_ddb.h"
 
@@ -200,6 +193,7 @@ sparc64_send_ipi(int upaid, ipifunc_t func, uint64_t arg1, uint64_t arg2)
 	int i, ik;
 	uint64_t intr_func;
 
+	KASSERT(upaid != curcpu()->ci_cpuid);
 	if (ldxa(0, ASR_IDSR) & IDSR_BUSY)
 		panic("recursive IPI?");
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.16 2008/03/15 14:55:22 ad Exp $	*/
+/*	$NetBSD: cpu.h,v 1.21 2008/04/30 12:44:27 ad Exp $	*/
 
 /*-
  * Copyright (c) 2007 YAMAMOTO Takashi,
@@ -48,8 +48,13 @@ void cpu_idle(void);
 void cpu_need_resched(struct cpu_info *, int);
 #endif
 
+#ifndef cpu_did_resched
+#define	cpu_did_resched(l)	/* nothing */
+#endif
+
 /* flags for cpu_need_resched */
-#define	RESCHED_IMMED	1
+#define	RESCHED_IMMED		1
+#define	RESCHED_KPREEMPT	2
 
 #ifndef CPU_INFO_ITERATOR
 #define	CPU_INFO_ITERATOR		int
@@ -66,9 +71,15 @@ struct	cpu_info *cpu_lookup(cpuid_t);
 struct	cpu_info *cpu_lookup_byindex(u_int);
 int	cpu_setonline(struct cpu_info *, bool);
 bool	cpu_intr_p(void);
+bool	cpu_kpreempt_enter(uintptr_t, int);
+void	cpu_kpreempt_exit(uintptr_t);
+bool	cpu_kpreempt_disabled(void);
+
+CIRCLEQ_HEAD(cpuqueue, cpu_info);
 
 extern kmutex_t cpu_lock;
 extern u_int maxcpus;
+extern struct cpuqueue cpu_queue;
   
 static inline u_int
 cpu_index(struct cpu_info *ci)

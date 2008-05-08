@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ural.c,v 1.27 2008/03/30 16:19:55 xtraeme Exp $ */
+/*	$NetBSD: if_ural.c,v 1.29 2008/04/27 09:32:08 nakayama Exp $ */
 /*	$FreeBSD: /repoman/r/ncvs/src/sys/dev/usb/if_ural.c,v 1.40 2006/06/02 23:14:40 sam Exp $	*/
 
 /*-
@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ural.c,v 1.27 2008/03/30 16:19:55 xtraeme Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ural.c,v 1.29 2008/04/27 09:32:08 nakayama Exp $");
 
 #include "bpfilter.h"
 
@@ -96,7 +96,6 @@ static const struct usb_devno ural_devs[] = {
 	{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DWLG122 },
 	{ USB_VENDOR_GIGABYTE,		USB_PRODUCT_GIGABYTE_GNWBKG },
 	{ USB_VENDOR_GUILLEMOT,		USB_PRODUCT_GUILLEMOT_HWGUSB254 },
-	{ USB_VENDOR_GUILLEMOT,		USB_PRODUCT_GUILLEMOT_HWGUSB254LB },
 	{ USB_VENDOR_MELCO,		USB_PRODUCT_MELCO_KG54 },
 	{ USB_VENDOR_MELCO,		USB_PRODUCT_MELCO_KG54AI },
 	{ USB_VENDOR_MELCO,		USB_PRODUCT_MELCO_KG54YB },
@@ -426,7 +425,7 @@ USB_ATTACH(ural)
 	usb_init_task(&sc->sc_task, ural_task, sc);
 	usb_callout_init(sc->sc_scan_ch);
 	sc->amrr.amrr_min_success_threshold = 1;
-	sc->amrr.amrr_min_success_threshold = 15;
+	sc->amrr.amrr_max_success_threshold = 15;
 	usb_callout_init(sc->sc_amrr_ch);
 
 	/* retrieve RT2570 rev. no */

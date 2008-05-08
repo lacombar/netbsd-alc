@@ -1,4 +1,4 @@
-/*	$NetBSD: mainbus.c,v 1.20 2007/12/09 20:27:43 jmcneill Exp $	*/
+/*	$NetBSD: mainbus.c,v 1.23 2008/04/29 19:19:29 ad Exp $	*/
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
@@ -31,13 +31,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.20 2007/12/09 20:27:43 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.23 2008/04/29 19:19:29 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-
-#include <machine/bus.h>
+#include <sys/reboot.h>
+#include <sys/bus.h>
 
 #include <dev/isa/isavar.h>
 #include <dev/pci/pcivar.h>
@@ -70,10 +70,10 @@ __KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.20 2007/12/09 20:27:43 jmcneill Exp $"
  * XXXfvdl ACPI
  */
 
-int	mainbus_match(struct device *, struct cfdata *, void *);
-void	mainbus_attach(struct device *, struct device *, void *);
+int	mainbus_match(device_t, cfdata_t, void *);
+void	mainbus_attach(device_t, device_t, void *);
 
-CFATTACH_DECL(mainbus, sizeof(struct device),
+CFATTACH_DECL_NEW(mainbus, 0,
     mainbus_match, mainbus_attach, NULL, NULL);
 
 int	mainbus_print(void *, const char *);
@@ -128,7 +128,7 @@ int mp_verbose = 0;
  * Probe for the mainbus; always succeeds.
  */
 int
-mainbus_match(struct device *parent, struct cfdata *match, void *aux)
+mainbus_match(device_t parent, cfdata_t match, void *aux)
 {
 
 	return 1;
@@ -138,7 +138,7 @@ mainbus_match(struct device *parent, struct cfdata *match, void *aux)
  * Attach the mainbus.
  */
 void
-mainbus_attach(struct device *parent, struct device *self, void *aux)
+mainbus_attach(device_t parent, device_t self, void *aux)
 {
 #if NPCI > 0
 	union mainbus_attach_args mba;
@@ -167,7 +167,7 @@ mainbus_attach(struct device *parent, struct device *self, void *aux)
 #endif
 
 #if NACPI > 0
-	if (acpi_check(self, "acpibus"))
+	if ((boothowto & RB_MD2) == 0 && acpi_check(self, "acpibus"))
 		acpi_present = acpi_probe();
 	/*
 	 * First, see if the MADT contains CPUs, and possibly I/O APICs.

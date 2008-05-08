@@ -1,4 +1,4 @@
-/*	$NetBSD: msdosfs_vfsops.c,v 1.61 2008/01/30 11:47:00 ad Exp $	*/
+/*	$NetBSD: msdosfs_vfsops.c,v 1.65 2008/05/06 18:43:44 ad Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -48,7 +48,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.61 2008/01/30 11:47:00 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.65 2008/05/06 18:43:44 ad Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_quota.h"
@@ -135,6 +135,7 @@ struct vfsops msdosfs_vfsops = {
 	(void *)eopnotsupp,		/* vfs_suspendctl */
 	genfs_renamelock_enter,
 	genfs_renamelock_exit,
+	(void *)eopnotsupp,
 	msdosfs_vnodeopv_descs,
 	0,
 	{ NULL, NULL },
@@ -212,14 +213,14 @@ msdosfs_mountroot()
 	args.dirmask = 0777;
 
 	if ((error = msdosfs_mountfs(rootvp, mp, l, &args)) != 0) {
-		vfs_unbusy(mp, false);
+		vfs_unbusy(mp, false, NULL);
 		vfs_destroy(mp);
 		return (error);
 	}
 
 	if ((error = update_mp(mp, &args)) != 0) {
 		(void)msdosfs_unmount(mp, 0);
-		vfs_unbusy(mp, false);
+		vfs_unbusy(mp, false, NULL);
 		vfs_destroy(mp);
 		vrele(rootvp);
 		return (error);
@@ -229,7 +230,7 @@ msdosfs_mountroot()
 	CIRCLEQ_INSERT_TAIL(&mountlist, mp, mnt_list);
 	mutex_exit(&mountlist_lock);
 	(void)msdosfs_statvfs(mp, &mp->mnt_stat);
-	vfs_unbusy(mp, false);
+	vfs_unbusy(mp, false, NULL);
 	return (0);
 }
 
@@ -857,7 +858,7 @@ msdosfs_unmount(mp, mntflags)
 		struct vnode *vp = pmp->pm_devvp;
 
 		printf("msdosfs_umount(): just before calling VOP_CLOSE()\n");
-		printf("flag %08x, usecount %d, writecount %ld, holdcnt %ld\n",
+		printf("flag %08x, usecount %d, writecount %d, holdcnt %d\n",
 		    vp->v_vflag | vp->v_iflag | vp->v_uflag, vp->v_usecount,
 		    vp->v_writecount, vp->v_holdcnt);
 		printf("mount %p, op %p\n",

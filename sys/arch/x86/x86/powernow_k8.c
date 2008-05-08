@@ -1,4 +1,4 @@
-/*	$NetBSD: powernow_k8.c,v 1.20 2007/04/05 21:23:43 xtraeme Exp $ */
+/*	$NetBSD: powernow_k8.c,v 1.22 2008/04/28 20:23:40 martin Exp $ */
 /*	$OpenBSD: powernow-k8.c,v 1.8 2006/06/16 05:58:50 gwk Exp $ */
 
 /*-
@@ -16,13 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -66,7 +59,7 @@
 /* AMD POWERNOW K8 driver */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: powernow_k8.c,v 1.20 2007/04/05 21:23:43 xtraeme Exp $");
+__KERNEL_RCSID(0, "$NetBSD: powernow_k8.c,v 1.22 2008/04/28 20:23:40 martin Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -364,12 +357,11 @@ k8_powernow_init_main(void)
 	uint32_t maxfid, maxvid, i;
 	const struct sysctlnode *freqnode, *node, *pnownode;
 	struct powernow_cpu_state *cstate;
-	char *cpuname;
-	const char *techname;
+	const char *cpuname, *techname;
 	size_t len;
 
 	freq_names_len = 0;
-	cpuname = curcpu()->ci_dev->dv_xname;
+	cpuname = device_xname(curcpu()->ci_dev);
 
 	k8pnow_current_state = NULL;
 

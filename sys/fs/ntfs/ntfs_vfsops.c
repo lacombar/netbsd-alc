@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs_vfsops.c,v 1.65 2008/01/30 11:47:00 ad Exp $	*/
+/*	$NetBSD: ntfs_vfsops.c,v 1.69 2008/05/06 18:43:44 ad Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 Semen Ustimenko
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.65 2008/01/30 11:47:00 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.69 2008/05/06 18:43:44 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -129,7 +129,7 @@ ntfs_mountroot()
 	args.mode = 0777;
 
 	if ((error = ntfs_mountfs(rootvp, mp, &args, l)) != 0) {
-		vfs_unbusy(mp, false);
+		vfs_unbusy(mp, false, NULL);
 		vfs_destroy(mp);
 		return (error);
 	}
@@ -138,7 +138,7 @@ ntfs_mountroot()
 	CIRCLEQ_INSERT_TAIL(&mountlist, mp, mnt_list);
 	mutex_exit(&mountlist_lock);
 	(void)ntfs_statvfs(mp, &mp->mnt_stat);
-	vfs_unbusy(mp, false);
+	vfs_unbusy(mp, false, NULL);
 	return (0);
 }
 
@@ -150,7 +150,6 @@ ntfs_init()
 	malloc_type_attach(M_NTFSNTNODE);
 	malloc_type_attach(M_NTFSFNODE);
 	malloc_type_attach(M_NTFSDIR);
-	malloc_type_attach(M_NTFSNTHASH);
 	malloc_type_attach(M_NTFSNTVATTR);
 	malloc_type_attach(M_NTFSRDATA);
 	malloc_type_attach(M_NTFSDECOMP);
@@ -173,7 +172,6 @@ ntfs_done()
 	malloc_type_detach(M_NTFSNTNODE);
 	malloc_type_detach(M_NTFSFNODE);
 	malloc_type_detach(M_NTFSDIR);
-	malloc_type_detach(M_NTFSNTHASH);
 	malloc_type_detach(M_NTFSNTVATTR);
 	malloc_type_detach(M_NTFSRDATA);
 	malloc_type_detach(M_NTFSDECOMP);
@@ -887,6 +885,7 @@ struct vfsops ntfs_vfsops = {
 	(void *)eopnotsupp,		/* vfs_suspendctl */
 	genfs_renamelock_enter,
 	genfs_renamelock_exit,
+	(void *)eopnotsupp,
 	ntfs_vnodeopv_descs,
 	0,
 	{ NULL, NULL },

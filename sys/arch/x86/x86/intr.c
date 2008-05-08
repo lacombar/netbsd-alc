@@ -1,7 +1,7 @@
-/*	$NetBSD: intr.c,v 1.40 2008/01/21 02:56:14 dyoung Exp $	*/
+/*	$NetBSD: intr.c,v 1.49 2008/05/07 07:00:16 joerg Exp $	*/
 
 /*-
- * Copyright (c) 2007 The NetBSD Foundation, Inc.
+ * Copyright (c) 2007, 2008 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -140,7 +133,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.40 2008/01/21 02:56:14 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.49 2008/05/07 07:00:16 joerg Exp $");
 
 #include "opt_multiprocessor.h"
 #include "opt_acpi.h"
@@ -295,7 +288,7 @@ x86_nmi(void)
 /*
  * Recalculate the interrupt masks from scratch.
  */
-void
+static void
 intr_calculatemasks(struct cpu_info *ci)
 {
 	int irq, level, unusedirqs, intrlevel[MAX_INTR_SOURCES];
@@ -471,7 +464,7 @@ intr_scan_bus(int bus, int pin, int *handle)
 }
 #endif
 
-int
+static int
 intr_allocate_slot_cpu(struct cpu_info *ci, struct pic *pic, int pin,
 		       int *index)
 {
@@ -509,7 +502,7 @@ intr_allocate_slot_cpu(struct cpu_info *ci, struct pic *pic, int pin,
 		snprintf(isp->is_evname, sizeof (isp->is_evname),
 		    "pin %d", pin);
 		evcnt_attach_dynamic(&isp->is_evcnt, EVCNT_TYPE_INTR, NULL,
-		    pic->pic_dev.dv_xname, isp->is_evname);
+		    device_xname(&pic->pic_dev), isp->is_evname);
 		ci->ci_isources[slot] = isp;
 	}
 	mutex_exit(&x86_intr_lock);
@@ -521,7 +514,7 @@ intr_allocate_slot_cpu(struct cpu_info *ci, struct pic *pic, int pin,
 /*
  * A simple round-robin allocator to assign interrupts to CPUs.
  */
-int
+static int
 intr_allocate_slot(struct pic *pic, int legacy_irq, int pin, int level,
 		   struct cpu_info **cip, int *index, int *idt_slot)
 {
@@ -559,7 +552,7 @@ intr_allocate_slot(struct pic *pic, int legacy_irq, int pin, int level,
 			snprintf(isp->is_evname, sizeof (isp->is_evname),
 			    "pin %d", pin);
 			evcnt_attach_dynamic(&isp->is_evcnt, EVCNT_TYPE_INTR,
-			    NULL, pic->pic_dev.dv_xname, isp->is_evname);
+			    NULL, device_xname(&pic->pic_dev), isp->is_evname);
 			mutex_enter(&x86_intr_lock);
 			ci->ci_isources[slot] = isp;
 			mutex_exit(&x86_intr_lock);
@@ -574,11 +567,7 @@ duplicate:
 		if (pic == &i8259_pic)
 			idtvec = ICU_OFFSET + legacy_irq;
 		else {
-#ifdef IOAPIC_HWMASK
-			if (level > isp->is_maxlevel) {
-#else
 			if (isp->is_minlevel == 0 || level < isp->is_minlevel) {
-#endif
 				idtvec = idt_vec_alloc(APIC_LEVEL(level),
 				    IDT_INTR_HIGH);
 				if (idtvec == 0)
@@ -688,7 +677,7 @@ intr_establish(int legacy_irq, struct pic *pic, int pin, int type, int level,
 	    &idt_vec);
 	if (error != 0) {
 		printf("failed to allocate interrupt slot for PIC %s pin %d\n",
-		    pic->pic_dev.dv_xname, pin);
+		    device_xname(&pic->pic_dev), pin);
 		return NULL;
 	}
 
@@ -736,7 +725,7 @@ intr_establish(int legacy_irq, struct pic *pic, int pin, int type, int level,
 	default:
 		mutex_exit(&x86_intr_lock);
 		panic("intr_establish: bad intr type %d for pic %s pin %d\n",
-		    source->is_type, pic->pic_dev.dv_xname, pin);
+		    source->is_type, device_xname(&pic->pic_dev), pin);
 	}
 
 	pic->pic_hwmask(pic, pin);
@@ -770,15 +759,14 @@ intr_establish(int legacy_irq, struct pic *pic, int pin, int type, int level,
 
 	mutex_exit(&x86_intr_lock);
 
-	if (ci->ci_isources[slot]->is_resume == NULL ||
-	    source->is_idtvec != idt_vec) {
+	if (source->is_resume == NULL || source->is_idtvec != idt_vec) {
 		if (source->is_idtvec != 0 && source->is_idtvec != idt_vec)
 			idt_vec_free(source->is_idtvec);
 		source->is_idtvec = idt_vec;
 		stubp = type == IST_LEVEL ?
 		    &pic->pic_level_stubs[slot] : &pic->pic_edge_stubs[slot];
-		ci->ci_isources[slot]->is_resume = stubp->ist_resume;
-		ci->ci_isources[slot]->is_recurse = stubp->ist_recurse;
+		source->is_resume = stubp->ist_resume;
+		source->is_recurse = stubp->ist_recurse;
 		setgate(&idt[idt_vec], stubp->ist_entry, 0, SDT_SYS386IGT,
 		    SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	}
@@ -836,7 +824,7 @@ intr_disestablish(struct intrhand *ih)
 
 #ifdef INTRDEBUG
 	printf("cpu%u: remove slot %d (pic %s pin %d vec %d)\n",
-	    ci->ci_apicid, ih->ih_slot, pic->pic_dev.dv_xname, ih->ih_pin,
+	    ci->ci_apicid, ih->ih_slot, device_xname(&pic->pic_dev), ih->ih_pin,
 	    idtvec);
 #endif
 
@@ -899,19 +887,26 @@ struct intrhand fake_softserial_intrhand;
 struct intrhand fake_softbio_intrhand;
 struct intrhand fake_timer_intrhand;
 struct intrhand fake_ipi_intrhand;
+struct intrhand fake_preempt_intrhand;
 
 #if NLAPIC > 0 && defined(MULTIPROCESSOR)
 static const char *x86_ipi_names[X86_NIPI] = X86_IPI_NAMES;
 #endif
 
-static inline int
-redzone_const_or_zero(int x)
+static inline bool
+redzone_const_or_false(bool x)
 {
 #ifdef DIAGNOSTIC
 	return x;
 #else
-	return 0;
+	return false;
 #endif /* !DIAGNOSTIC */
+}
+
+static inline int
+redzone_const_or_zero(int x)
+{
+	return redzone_const_or_false(true) ? x : 0;
 }
 
 /*
@@ -921,14 +916,12 @@ redzone_const_or_zero(int x)
 void
 cpu_intr_init(struct cpu_info *ci)
 {
-#if NLAPIC > 0
 	struct intrsource *isp;
-#endif
 #if NLAPIC > 0 && defined(MULTIPROCESSOR)
 	int i;
 #endif
 #ifdef INTRSTACKSIZE
-	char *cp;
+	vaddr_t istack;
 #endif
 
 #if NLAPIC > 0
@@ -942,8 +935,8 @@ cpu_intr_init(struct cpu_info *ci)
 	isp->is_handlers = &fake_timer_intrhand;
 	isp->is_pic = &local_pic;
 	ci->ci_isources[LIR_TIMER] = isp;
-	evcnt_attach_dynamic(&isp->is_evcnt, EVCNT_TYPE_INTR, NULL,
-	    ci->ci_dev->dv_xname, "timer");
+	evcnt_attach_dynamic(&isp->is_evcnt, EVCNT_TYPE_MISC, NULL,
+	    device_xname(ci->ci_dev), "timer");
 
 #ifdef MULTIPROCESSOR
 	MALLOC(isp, struct intrsource *, sizeof (struct intrsource), M_DEVBUF,
@@ -958,16 +951,43 @@ cpu_intr_init(struct cpu_info *ci)
 	ci->ci_isources[LIR_IPI] = isp;
 
 	for (i = 0; i < X86_NIPI; i++)
-		evcnt_attach_dynamic(&ci->ci_ipi_events[i], EVCNT_TYPE_INTR,
-		    NULL, ci->ci_dev->dv_xname, x86_ipi_names[i]);
+		evcnt_attach_dynamic(&ci->ci_ipi_events[i], EVCNT_TYPE_MISC,
+		    NULL, device_xname(ci->ci_dev), x86_ipi_names[i]);
 #endif
 #endif
+
+	MALLOC(isp, struct intrsource *, sizeof (struct intrsource), M_DEVBUF,
+	    M_WAITOK|M_ZERO);
+	if (isp == NULL)
+		panic("can't allocate fixed interrupt source");
+	isp->is_recurse = Xpreemptrecurse;
+	isp->is_resume = Xpreemptresume;
+	fake_preempt_intrhand.ih_level = IPL_PREEMPT;
+	isp->is_handlers = &fake_preempt_intrhand;
+	isp->is_pic = &softintr_pic;
+	ci->ci_isources[SIR_PREEMPT] = isp;
 
 	intr_calculatemasks(ci);
 
 #if defined(INTRSTACKSIZE)
-	cp = (char *)uvm_km_alloc(kernel_map, INTRSTACKSIZE, 0, UVM_KMF_WIRED);
-	ci->ci_intrstack = cp + INTRSTACKSIZE - sizeof(register_t);
+	/*
+	 * If the red zone is activated, protect both the top and
+	 * the bottom of the stack with an unmapped page.
+	 */
+	istack = uvm_km_alloc(kernel_map,
+	    INTRSTACKSIZE + redzone_const_or_zero(2 * PAGE_SIZE), 0,
+	    UVM_KMF_WIRED);
+	if (redzone_const_or_false(true)) {
+		pmap_kremove(istack, PAGE_SIZE);
+		pmap_kremove(istack + INTRSTACKSIZE + PAGE_SIZE, PAGE_SIZE);
+		pmap_update(pmap_kernel());
+	}
+	/* 33 used to be 1.  Arbitrarily reserve 32 more register_t's
+	 * of space for ddb(4) to examine some subroutine arguments
+	 * and to hunt for the next stack frame.
+	 */
+	ci->ci_intrstack = (char *)istack + redzone_const_or_zero(PAGE_SIZE) +
+	    INTRSTACKSIZE - 33 * sizeof(register_t);
 #if defined(__x86_64__)
 	ci->ci_tss.tss_ist[0] = (uintptr_t)ci->ci_intrstack & ~0xf;
 #endif /* defined(__x86_64__) */

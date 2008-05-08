@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.22 2008/01/15 14:50:09 joerg Exp $	*/
+/*	$NetBSD: fpu.c,v 1.24 2008/04/30 00:16:30 cegger Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.22 2008/01/15 14:50:09 joerg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.24 2008/04/30 00:16:30 cegger Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -120,7 +120,7 @@ __KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.22 2008/01/15 14:50:09 joerg Exp $");
  */
 
 void fpudna(struct cpu_info *);
-static int x86fpflags_to_ksiginfo(u_int32_t);
+static int x86fpflags_to_ksiginfo(uint32_t);
 
 /*
  * Init the FPU.
@@ -147,8 +147,8 @@ fputrap(frame)
 {
 	register struct lwp *l = curcpu()->ci_fpcurlwp;
 	struct savefpu *sfp = &l->l_addr->u_pcb.pcb_savefpu;
-	u_int32_t mxcsr, statbits;
-	u_int16_t cw;
+	uint32_t mxcsr, statbits;
+	uint16_t cw;
 	ksiginfo_t ksi;
 
 	/*
@@ -183,7 +183,7 @@ fputrap(frame)
 }
 
 static int
-x86fpflags_to_ksiginfo(u_int32_t flags)
+x86fpflags_to_ksiginfo(uint32_t flags)
 {
 	int i;
 	static int x86fp_ksiginfo_table[] = {
@@ -214,13 +214,13 @@ x86fpflags_to_ksiginfo(u_int32_t flags)
 void
 fpudna(struct cpu_info *ci)
 {
-	u_int16_t cw;
-	u_int32_t mxcsr;
+	uint16_t cw;
+	uint32_t mxcsr;
 	struct lwp *l;
 	int s;
 
 	if (ci->ci_fpsaving) {
-		printf("recursive fpu trap; cr0=%x\n", rcr0());
+		printf("recursive fpu trap; cr0=%lx\n", rcr0());
 		return;
 	}
 

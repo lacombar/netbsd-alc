@@ -1,4 +1,4 @@
-/*	$NetBSD: subr_devsw.c,v 1.16 2008/03/21 19:32:07 plunky Exp $	*/
+/*	$NetBSD: subr_devsw.c,v 1.18 2008/04/28 20:24:04 martin Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002, 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -76,7 +69,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: subr_devsw.c,v 1.16 2008/03/21 19:32:07 plunky Exp $");
+__KERNEL_RCSID(0, "$NetBSD: subr_devsw.c,v 1.18 2008/04/28 20:24:04 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -626,20 +619,20 @@ devsw_blk2chr(dev_t bdev)
  */
 
 #define	DEV_LOCK(d)						\
-	if ((d->d_flag & D_MPSAFE) == 0) {			\
-		KERNEL_LOCK(1, curlwp);				\
+	if ((mpflag = (d->d_flag & D_MPSAFE)) == 0) {		\
+		KERNEL_LOCK(1, NULL);				\
 	}
 
 #define	DEV_UNLOCK(d)						\
-	if ((d->d_flag & D_MPSAFE) == 0) {			\
-		KERNEL_UNLOCK_ONE(curlwp);			\
+	if (mpflag == 0) {					\
+		KERNEL_UNLOCK_ONE(NULL);			\
 	}
 
 int
 bdev_open(dev_t dev, int flag, int devtype, lwp_t *l)
 {
 	const struct bdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	/*
 	 * For open we need to lock, in order to synchronize
@@ -662,7 +655,7 @@ int
 bdev_close(dev_t dev, int flag, int devtype, lwp_t *l)
 {
 	const struct bdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = bdevsw_lookup(dev)) == NULL)
 		return ENXIO;
@@ -678,6 +671,7 @@ void
 bdev_strategy(struct buf *bp)
 {
 	const struct bdevsw *d;
+	int mpflag;
 
 	if ((d = bdevsw_lookup(bp->b_dev)) == NULL)
 		panic("bdev_strategy");
@@ -691,7 +685,7 @@ int
 bdev_ioctl(dev_t dev, u_long cmd, void *data, int flag, lwp_t *l)
 {
 	const struct bdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = bdevsw_lookup(dev)) == NULL)
 		return ENXIO;
@@ -738,7 +732,7 @@ int
 cdev_open(dev_t dev, int flag, int devtype, lwp_t *l)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	/*
 	 * For open we need to lock, in order to synchronize
@@ -761,7 +755,7 @@ int
 cdev_close(dev_t dev, int flag, int devtype, lwp_t *l)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return ENXIO;
@@ -777,7 +771,7 @@ int
 cdev_read(dev_t dev, struct uio *uio, int flag)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return ENXIO;
@@ -793,7 +787,7 @@ int
 cdev_write(dev_t dev, struct uio *uio, int flag)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return ENXIO;
@@ -809,7 +803,7 @@ int
 cdev_ioctl(dev_t dev, u_long cmd, void *data, int flag, lwp_t *l)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return ENXIO;
@@ -825,6 +819,7 @@ void
 cdev_stop(struct tty *tp, int flag)
 {
 	const struct cdevsw *d;
+	int mpflag;
 
 	if ((d = cdevsw_lookup(tp->t_dev)) == NULL)
 		return;
@@ -839,6 +834,7 @@ cdev_tty(dev_t dev)
 {
 	const struct cdevsw *d;
 	struct tty * rv;
+	int mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return NULL;
@@ -858,7 +854,7 @@ int
 cdev_poll(dev_t dev, int flag, lwp_t *l)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return POLLERR;
@@ -875,6 +871,7 @@ cdev_mmap(dev_t dev, off_t off, int flag)
 {
 	const struct cdevsw *d;
 	paddr_t rv;
+	int mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return (paddr_t)-1LL;
@@ -890,7 +887,7 @@ int
 cdev_kqfilter(dev_t dev, struct knote *kn)
 {
 	const struct cdevsw *d;
-	int rv;
+	int rv, mpflag;
 
 	if ((d = cdevsw_lookup(dev)) == NULL)
 		return ENXIO;

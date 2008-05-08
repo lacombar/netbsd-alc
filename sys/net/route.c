@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.106 2008/03/26 14:54:19 ad Exp $	*/
+/*	$NetBSD: route.c,v 1.108 2008/04/28 20:24:09 martin Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2008 The NetBSD Foundation, Inc.
@@ -16,13 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -100,7 +93,7 @@
 #include "opt_route.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: route.c,v 1.106 2008/03/26 14:54:19 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: route.c,v 1.108 2008/04/28 20:24:09 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/sysctl.h>
@@ -1260,6 +1253,7 @@ rtcache_free(struct route *ro)
 	if (ro->ro_sa != NULL) {
 		sockaddr_free(ro->ro_sa);
 		ro->ro_sa = NULL;
+		KASSERT(ro->_ro_rt == NULL);
 	}
 }
 
@@ -1276,8 +1270,11 @@ rtcache_setdst(struct route *ro, const struct sockaddr *sa)
 	} else if (ro->ro_sa != NULL)
 		rtcache_free(ro);	/* free ro_sa, wrong family */
 
-	if ((ro->ro_sa = sockaddr_dup(sa, M_NOWAIT)) == NULL)
+	KASSERT(ro->_ro_rt == NULL);
+
+	if ((ro->ro_sa = sockaddr_dup(sa, M_NOWAIT)) == NULL) {
 		return ENOMEM;
+	}
 	return 0;
 }
 

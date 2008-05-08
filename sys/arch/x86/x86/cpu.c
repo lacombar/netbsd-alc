@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.23 2008/03/04 15:24:02 cube Exp $	*/
+/*	$NetBSD: cpu.c,v 1.36 2008/04/29 19:19:29 ad Exp $	*/
 
 /*-
  * Copyright (c) 2000, 2006, 2007 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -69,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.23 2008/03/04 15:24:02 cube Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.36 2008/04/29 19:19:29 ad Exp $");
 
 #include "opt_ddb.h"
 #include "opt_multiprocessor.h"
@@ -87,6 +80,7 @@ __KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.23 2008/03/04 15:24:02 cube Exp $");
 #include <sys/malloc.h>
 #include <sys/cpu.h>
 #include <sys/atomic.h>
+#include <sys/reboot.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -110,10 +104,6 @@ __KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.23 2008/03/04 15:24:02 cube Exp $");
 #include <machine/apicvar.h>
 #include <machine/i82489reg.h>
 #include <machine/i82489var.h>
-#endif
-
-#if NIOAPIC > 0
-#include <machine/i82093var.h>
 #endif
 
 #include <dev/ic/mc146818reg.h>
@@ -250,6 +240,23 @@ cpu_vm_init(struct cpu_info *ci)
 			tcolors /= cai->cai_associativity;
 		}
 		ncolors = max(ncolors, tcolors);
+		/*
+		 * If the desired number of colors is not a power of
+		 * two, it won't be good.  Find the greatest power of
+		 * two which is an even divisor of the number of colors,
+		 * to preserve even coloring of pages.
+		 */
+		if (ncolors & (ncolors - 1) ) {
+			int try, picked = 1;
+			for (try = 1; try < ncolors; try *= 2) {
+				if (ncolors % try == 0) picked = try;
+			}
+			if (picked == 1) {
+				panic("desired number of cache colors %d is "
+			      	" > 1, but not even!", ncolors);
+			}
+			ncolors = picked;
+		}
 	}
 
 	/*
@@ -258,7 +265,7 @@ cpu_vm_init(struct cpu_info *ci)
 	 */
 	if (ncolors <= uvmexp.ncolors)
 		return;
-	aprint_verbose("%s: %d page colors\n", ci->ci_dev->dv_xname, ncolors);
+	aprint_verbose_dev(ci->ci_dev, "%d page colors\n", ncolors);
 	uvm_page_recolor(ncolors);
 }
 
@@ -270,9 +277,7 @@ cpu_attach(device_t parent, device_t self, void *aux)
 	struct cpu_attach_args *caa = aux;
 	struct cpu_info *ci;
 	uintptr_t ptr;
-#if defined(MULTIPROCESSOR)
 	int cpunum = caa->cpu_number;
-#endif
 
 	sc->sc_dev = self;
 
@@ -281,6 +286,15 @@ cpu_attach(device_t parent, device_t self, void *aux)
 	 * structure, otherwise use the primary's.
 	 */
 	if (caa->cpu_role == CPU_ROLE_AP) {
+		if ((boothowto & RB_MD1) != 0) {
+			aprint_error(": multiprocessor boot disabled\n");
+			return;
+		}
+		if (cpunum >= X86_MAXPROCS) {
+			aprint_error(": apic id %d ignored, "
+			    "please increase X86_MAXPROCS\n", cpunum);
+			return;
+		}
 		aprint_naive(": Application Processor\n");
 		ptr = (uintptr_t)malloc(sizeof(*ci) + CACHE_LINE_SIZE - 1,
 		    M_DEVBUF, M_WAITOK);
@@ -333,8 +347,8 @@ cpu_attach(device_t parent, device_t self, void *aux)
 		error = mi_cpu_attach(ci);
 		if (error != 0) {
 			aprint_normal("\n");
-			aprint_error("%s: mi_cpu_attach failed with %d\n",
-			    device_xname(sc->sc_dev), error);
+			aprint_error_dev(sc->sc_dev,
+			    "mi_cpu_attach failed with %d\n", error);
 			return;
 		}
 #endif
@@ -379,9 +393,6 @@ cpu_attach(device_t parent, device_t self, void *aux)
 		lapic_set_lvt();
 		lapic_calibrate_timer(ci);
 #endif
-#if NIOAPIC > 0
-		ioapic_bsp_id = caa->cpu_number;
-#endif
 		x86_errata();
 		break;
 
@@ -404,12 +415,12 @@ cpu_attach(device_t parent, device_t self, void *aux)
 			cpu_info_list->ci_next = ci;
 		}
 #else
-		aprint_normal("%s: not started\n", device_xname(sc->sc_dev));
+		aprint_normal_dev(sc->sc_dev, "not started\n");
 #endif
 		break;
 
 	default:
-		printf("\n");
+		aprint_normal("\n");
 		panic("unknown processor type??\n");
 	}
 	cpu_vm_init(ci);
@@ -423,9 +434,9 @@ cpu_attach(device_t parent, device_t self, void *aux)
 	if (mp_verbose) {
 		struct lwp *l = ci->ci_data.cpu_idlelwp;
 
-		aprint_verbose(
-		    "%s: idle lwp at %p, idle sp at %p\n",
-		    device_xname(sc->sc_dev), l,
+		aprint_verbose_dev(sc->sc_dev,
+		    "idle lwp at %p, idle sp at %p\n",
+		    l,
 #ifdef i386
 		    (void *)l->l_addr->u_pcb.pcb_esp
 #else
@@ -577,20 +588,29 @@ cpu_start_secondary(struct cpu_info *ci)
 
 	atomic_or_32(&ci->ci_flags, CPUF_AP);
 
-	aprint_debug("%s: starting\n", ci->ci_dev->dv_xname);
+	aprint_debug_dev(ci->ci_dev, "starting\n");
 
 	ci->ci_curlwp = ci->ci_data.cpu_idlelwp;
-	CPU_STARTUP(ci, mp_trampoline_paddr);
+	if (CPU_STARTUP(ci, mp_trampoline_paddr) != 0)
+		return;
 
 	/*
 	 * wait for it to become ready
 	 */
-	for (i = 100000; (!(ci->ci_flags & CPUF_PRESENT)) && i>0;i--) {
+	for (i = 100000; (!(ci->ci_flags & CPUF_PRESENT)) && i > 0; i--) {
+#ifdef MPDEBUG
+		extern int cpu_trace[3];
+		static int otrace[3];
+		if (memcmp(otrace, cpu_trace, sizeof(otrace)) != 0) {
+			aprint_debug_dev(ci->ci_dev, "trace %02x %02x %02x\n",
+			    cpu_trace[0], cpu_trace[1], cpu_trace[2]);
+			memcpy(otrace, cpu_trace, sizeof(otrace));
+		}
+#endif
 		i8254_delay(10);
 	}
 	if ((ci->ci_flags & CPUF_PRESENT) == 0) {
-		aprint_error("%s: failed to become ready\n",
-		    ci->ci_dev->dv_xname);
+		aprint_error_dev(ci->ci_dev, "failed to become ready\n");
 #if defined(MPDEBUG) && defined(DDB)
 		printf("dropping into debugger; continue from here to resume boot\n");
 		Debugger();
@@ -606,11 +626,11 @@ cpu_boot_secondary(struct cpu_info *ci)
 	int i;
 
 	atomic_or_32(&ci->ci_flags, CPUF_GO);
-	for (i = 100000; (!(ci->ci_flags & CPUF_RUNNING)) && i>0;i--) {
+	for (i = 100000; (!(ci->ci_flags & CPUF_RUNNING)) && i > 0; i--) {
 		i8254_delay(10);
 	}
 	if ((ci->ci_flags & CPUF_RUNNING) == 0) {
-		aprint_error("%s: failed to start\n", ci->ci_dev->dv_xname);
+		aprint_error_dev(ci->ci_dev, "failed to start\n");
 #if defined(MPDEBUG) && defined(DDB)
 		printf("dropping into debugger; continue from here to resume boot\n");
 		Debugger();
@@ -645,7 +665,7 @@ cpu_hatch(void *v)
 			x86_pause();
 	}
 
-	/* Beacuse the text may have been patched in x86_patch(). */
+	/* Because the text may have been patched in x86_patch(). */
 	wbinvd();
 	x86_flush();
 
@@ -681,7 +701,7 @@ cpu_hatch(void *v)
 	splx(s);
 	x86_errata();
 
-	aprint_debug("%s: CPU %ld running\n", ci->ci_dev->dv_xname,
+	aprint_debug_dev(ci->ci_dev, "CPU %ld running\n",
 	    (long)ci->ci_cpuid);
 }
 
@@ -699,11 +719,11 @@ cpu_debug_dump(void)
 	struct cpu_info *ci;
 	CPU_INFO_ITERATOR cii;
 
-	db_printf("addr		dev	id	flags	ipis	curproc		fpcurproc\n");
+	db_printf("addr		dev	id	flags	ipis	curlwp 		fpcurlwp\n");
 	for (CPU_INFO_FOREACH(cii, ci)) {
 		db_printf("%p	%s	%ld	%x	%x	%10p	%10p\n",
 		    ci,
-		    ci->ci_dev == NULL ? "BOOT" : ci->ci_dev->dv_xname,
+		    ci->ci_dev == NULL ? "BOOT" : device_xname(ci->ci_dev),
 		    (long)ci->ci_cpuid,
 		    ci->ci_flags, ci->ci_ipis,
 		    ci->ci_curlwp,
@@ -731,7 +751,7 @@ cpu_copy_trampoline(void)
 	pmap_update(pmap_kernel());
 	memcpy((void *)mp_trampoline_vaddr,
 	    cpu_spinup_trampoline,
-	    cpu_spinup_trampoline_end-cpu_spinup_trampoline);
+	    cpu_spinup_trampoline_end - cpu_spinup_trampoline);
 
 	pmap_kremove(mp_trampoline_vaddr, PAGE_SIZE);
 	pmap_update(pmap_kernel());
@@ -839,33 +859,45 @@ mp_cpu_start(struct cpu_info *ci, paddr_t target)
 	dwordptr[0] = 0;
 	dwordptr[1] = target >> 4;
 
-	memcpy((uint8_t *)(cmos_data_mapping + 0x467), dwordptr, 4);
+	memcpy((uint8_t *)cmos_data_mapping + 0x467, dwordptr, 4);
 
 #if NLAPIC > 0
+	if ((cpu_feature & CPUID_APIC) == 0) {
+		aprint_error("mp_cpu_start: CPU does not have APIC\n");
+		return ENODEV;
+	}
+
 	/*
 	 * ... prior to executing the following sequence:"
 	 */
 
 	if (ci->ci_flags & CPUF_AP) {
-		if ((error = x86_ipi_init(ci->ci_apicid)) != 0)
+		error = x86_ipi_init(ci->ci_apicid);
+		if (error != 0) {
+			aprint_error_dev(ci->ci_dev, "%s: IPI not taken (1)\n",
+					__func__);
 			return error;
+		}
 
 		i8254_delay(10000);
 
-		if (cpu_feature & CPUID_APIC) {
-
-			if ((error = x86_ipi(target / PAGE_SIZE,
-					     ci->ci_apicid,
-					     LAPIC_DLMODE_STARTUP)) != 0)
-				return error;
-			i8254_delay(200);
-
-			if ((error = x86_ipi(target / PAGE_SIZE,
-					     ci->ci_apicid,
-					     LAPIC_DLMODE_STARTUP)) != 0)
-				return error;
-			i8254_delay(200);
+		error = x86_ipi(target / PAGE_SIZE, ci->ci_apicid,
+		    LAPIC_DLMODE_STARTUP);
+		if (error != 0) {
+			aprint_error_dev(ci->ci_dev, "%s: IPI not taken (2)\n",
+					__func__);
+			return error;
 		}
+		i8254_delay(200);
+
+		error = x86_ipi(target / PAGE_SIZE, ci->ci_apicid,
+		    LAPIC_DLMODE_STARTUP);
+		if (error != 0) {
+			aprint_error_dev(ci->ci_dev, "%s: IPI not taken (3)\n",
+					__func__);
+			return error;
+		}
+		i8254_delay(200);
 	}
 #endif
 	return 0;
@@ -898,7 +930,7 @@ cpu_init_msrs(struct cpu_info *ci, bool full)
 
 	if (full) {
 		wrmsr(MSR_FSBASE, 0);
-		wrmsr(MSR_GSBASE, (u_int64_t)ci);
+		wrmsr(MSR_GSBASE, (uint64_t)ci);
 		wrmsr(MSR_KERNELGSBASE, 0);
 	}
 

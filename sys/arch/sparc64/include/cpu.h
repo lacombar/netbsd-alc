@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.77 2008/03/17 04:04:00 nakayama Exp $ */
+/*	$NetBSD: cpu.h,v 1.80 2008/04/29 14:06:31 ad Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -128,7 +128,6 @@ struct cpu_info {
 	/* Interrupts */
 	struct intrhand		*ci_intrpending[16];
 	struct intrhand		*ci_tick_ih;
-	struct intrhand		*ci_sched_ih;
 
 	/* Event counters */
 	struct evcnt		ci_tick_evcnt;
@@ -288,10 +287,9 @@ void setsoftnet(void);
 #define	cpu_need_proftick(l)	((l)->l_pflag |= LP_OWEUPC, want_ast = 1)
 
 /*
- * Notify the current process (l) that it has a signal pending,
- * process as soon as possible.
+ * Notify an LWP that it has a signal pending, process as soon as possible.
  */
-#define	cpu_signotify(l)	(want_ast = 1)
+void cpu_signotify(struct lwp *);
 
 /*
  * Interrupt handler chains.  Interrupt handlers should return 0 for
@@ -318,7 +316,9 @@ extern struct intrhand *intrhand[];
 extern struct intrhand *intrlev[MAXINTNUM];
 
 void	intr_establish(int level, struct intrhand *);
-struct intrhand *init_softint(int, int (*)(void *));
+void	*sparc_softintr_establish(int, int (*)(void *), void *);
+void	sparc_softintr_schedule(void *);
+void	sparc_softintr_disestablish(void *);
 
 /* disksubr.c */
 struct dkbad;

@@ -1,4 +1,4 @@
-/*	$NetBSD: nd6.c,v 1.123 2007/12/04 10:27:34 dyoung Exp $	*/
+/*	$NetBSD: nd6.c,v 1.126 2008/04/24 11:38:38 ad Exp $	*/
 /*	$KAME: nd6.c,v 1.279 2002/06/08 11:16:51 itojun Exp $	*/
 
 /*
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nd6.c,v 1.123 2007/12/04 10:27:34 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nd6.c,v 1.126 2008/04/24 11:38:38 ad Exp $");
 
 #include "opt_ipsec.h"
 
@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: nd6.c,v 1.123 2007/12/04 10:27:34 dyoung Exp $");
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/sockio.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
@@ -65,6 +66,7 @@ __KERNEL_RCSID(0, "$NetBSD: nd6.c,v 1.123 2007/12/04 10:27:34 dyoung Exp $");
 #include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
+#include <netinet6/icmp6_private.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -147,8 +149,8 @@ nd6_init(void)
 
 	nd6_init_done = 1;
 
-	callout_init(&nd6_slowtimo_ch, 0);
-	callout_init(&nd6_timer_ch, 0);
+	callout_init(&nd6_slowtimo_ch, CALLOUT_MPSAFE);
+	callout_init(&nd6_timer_ch, CALLOUT_MPSAFE);
 
 	/* start timer */
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
@@ -320,7 +322,7 @@ nd6_options(union nd_opts *ndopts)
 			 * Message validation requires that all included
 			 * options have a length that is greater than zero.
 			 */
-			icmp6stat.icp6s_nd_badopt++;
+			ICMP6_STATINC(ICMP6_STAT_ND_BADOPT);
 			bzero(ndopts, sizeof(*ndopts));
 			return -1;
 		}
@@ -364,7 +366,7 @@ nd6_options(union nd_opts *ndopts)
 skip1:
 		i++;
 		if (i > nd6_maxndopt) {
-			icmp6stat.icp6s_nd_toomanyopt++;
+			ICMP6_STATINC(ICMP6_STAT_ND_TOOMANYOPT);
 			nd6log((LOG_INFO, "too many loop in nd opt\n"));
 			break;
 		}
@@ -409,20 +411,21 @@ nd6_llinfo_settimer(struct llinfo_nd6 *ln, long xtick)
 static void
 nd6_llinfo_timer(void *arg)
 {
-	int s;
 	struct llinfo_nd6 *ln;
 	struct rtentry *rt;
 	const struct sockaddr_in6 *dst;
 	struct ifnet *ifp;
 	struct nd_ifinfo *ndi = NULL;
 
-	s = splsoftnet();
+	mutex_enter(softnet_lock);
+	KERNEL_LOCK(1, NULL);
 
 	ln = (struct llinfo_nd6 *)arg;
 
 	if (ln->ln_ntick > 0) {
 		nd6_llinfo_settimer(ln, ln->ln_ntick);
-		splx(s);
+		KERNEL_UNLOCK_ONE(NULL);
+		mutex_exit(softnet_lock);
 		return;
 	}
 
@@ -508,7 +511,8 @@ nd6_llinfo_timer(void *arg)
 		break;
 	}
 
-	splx(s);
+	KERNEL_UNLOCK_ONE(NULL);
+	mutex_exit(softnet_lock);
 }
 
 /*
@@ -517,15 +521,16 @@ nd6_llinfo_timer(void *arg)
 void
 nd6_timer(void *ignored_arg)
 {
-	int s;
 	struct nd_defrouter *next_dr, *dr;
 	struct nd_prefix *next_pr, *pr;
 	struct in6_ifaddr *ia6, *nia6;
 	struct in6_addrlifetime *lt6;
 
-	s = splsoftnet();
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
 	    nd6_timer, NULL);
+
+	mutex_enter(softnet_lock);
+	KERNEL_LOCK(1, NULL);
 
 	/* expire default router list */
 	
@@ -627,7 +632,9 @@ nd6_timer(void *ignored_arg)
 			prelist_remove(pr);
 		}
 	}
-	splx(s);
+
+	KERNEL_UNLOCK_ONE(NULL);
+	mutex_exit(softnet_lock);
 }
 
 /* ia6: deprecated/invalidated temporary address */
@@ -1271,7 +1278,7 @@ nd6_rtrequest(int req, struct rtentry *rt, struct rt_addrinfo *info)
 		nd6_allocated++;
 		bzero(ln, sizeof(*ln));
 		ln->ln_rt = rt;
-		callout_init(&ln->ln_timer_ch, 0);
+		callout_init(&ln->ln_timer_ch, CALLOUT_MPSAFE);
 		/* this is required for "ndp" command. - shin */
 		if (req == RTM_ADD) {
 		        /*
@@ -1869,11 +1876,12 @@ fail:
 static void
 nd6_slowtimo(void *ignored_arg)
 {
-	int s = splsoftnet();
 	struct nd_ifinfo *nd6if;
 	struct ifnet *ifp;
 
-	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
+	mutex_enter(softnet_lock);
+	KERNEL_LOCK(1, NULL);
+      	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		nd6if = ND_IFINFO(ifp);
@@ -1889,7 +1897,8 @@ nd6_slowtimo(void *ignored_arg)
 			nd6if->reachable = ND_COMPUTE_RTIME(nd6if->basereachable);
 		}
 	}
-	splx(s);
+	KERNEL_UNLOCK_ONE(NULL);
+	mutex_exit(softnet_lock);
 }
 
 #define senderr(e) { error = (e); goto bad;}

@@ -1,4 +1,4 @@
-/*	$NetBSD: agten.c,v 1.8 2007/10/19 12:01:09 ad Exp $ */
+/*	$NetBSD: agten.c,v 1.10 2008/04/29 06:53:03 martin Exp $ */
 
 /*-
  * Copyright (c) 2007 Michael Lorenz
@@ -12,9 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -30,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: agten.c,v 1.8 2007/10/19 12:01:09 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: agten.c,v 1.10 2008/04/29 06:53:03 martin Exp $");
 
 /*
  * a driver for the Fujitsu AG-10e SBus framebuffer
@@ -246,8 +243,7 @@ agten_attach(struct device *parent, struct device *dev, void *aux)
 	    sa->sa_reg[0].oa_space, sa->sa_reg[0].oa_base + reg,
 	    sc->sc_i128_fbsz, BUS_SPACE_MAP_LINEAR, &sc->sc_i128_fbh) != 0) {
 
-		aprint_error("%s: unable to map the framebuffer\n",
-		    dev->dv_xname);
+		aprint_error_dev(dev, "unable to map the framebuffer\n");
 		return;
 	}
 	fb->fb_pixels = bus_space_vaddr(sc->sc_bustag, sc->sc_i128_fbh);
@@ -257,8 +253,7 @@ agten_attach(struct device *parent, struct device *dev, void *aux)
 	    sa->sa_reg[0].oa_space, sa->sa_reg[0].oa_base + reg,
 	    0x10000, 0, &sc->sc_i128_regh) != 0) {
 
-		aprint_error("%s: unable to map I128 registers\n",
-		    dev->dv_xname);
+		aprint_error_dev(dev, "unable to map I128 registers\n");
 		return;
 	}
 
@@ -267,8 +262,7 @@ agten_attach(struct device *parent, struct device *dev, void *aux)
 	    sa->sa_reg[0].oa_space, sa->sa_reg[0].oa_base + reg,
 	    0x8000, 0, &sc->sc_p9100_regh) != 0) {
 
-		aprint_error("%s: unable to map P9100 registers\n",
-		    dev->dv_xname);
+		aprint_error_dev(dev, "unable to map P9100 registers\n");
 		return;
 	}
 

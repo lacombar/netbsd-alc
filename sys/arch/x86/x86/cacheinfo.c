@@ -1,4 +1,4 @@
-/*	$NetBSD: cacheinfo.c,v 1.15 2008/03/11 22:43:08 joerg Exp $	*/
+/*	$NetBSD: cacheinfo.c,v 1.17 2008/04/28 20:23:40 martin Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the NetBSD
- *      Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -37,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cacheinfo.c,v 1.15 2008/03/11 22:43:08 joerg Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cacheinfo.c,v 1.17 2008/04/28 20:23:40 martin Exp $");
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -65,7 +58,7 @@ print_cache_config(struct cpu_info *ci, int cache_tag, const char *name,
 		return sep;
 
 	if (sep == NULL)
-		aprint_verbose("%s: ", ci->ci_dev->dv_xname);
+		aprint_verbose_dev(ci->ci_dev, "");
 	else
 		aprint_verbose("%s", sep);
 	if (name != NULL)
@@ -105,7 +98,7 @@ print_tlb_config(struct cpu_info *ci, int cache_tag, const char *name,
 		return sep;
 
 	if (sep == NULL)
-		aprint_verbose("%s: ", ci->ci_dev->dv_xname);
+		aprint_verbose_dev(ci->ci_dev, "");
 	else
 		aprint_verbose("%s", sep);
 	if (name != NULL)
@@ -135,7 +128,7 @@ print_tlb_config(struct cpu_info *ci, int cache_tag, const char *name,
 }
 
 const struct x86_cache_info *
-cache_info_lookup(const struct x86_cache_info *cai, u_int8_t desc)
+cache_info_lookup(const struct x86_cache_info *cai, uint8_t desc)
 {
 	int i;
 

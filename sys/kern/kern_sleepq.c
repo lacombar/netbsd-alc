@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sleepq.c,v 1.23 2008/03/28 20:48:36 ad Exp $	*/
+/*	$NetBSD: kern_sleepq.c,v 1.28 2008/04/28 20:24:03 martin Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -15,13 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the NetBSD
- *	Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -42,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_sleepq.c,v 1.23 2008/03/28 20:48:36 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_sleepq.c,v 1.28 2008/04/28 20:24:03 martin Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -107,7 +100,6 @@ sleepq_remove(sleepq_t *sq, lwp_t *l)
 {
 	struct schedstate_percpu *spc;
 	struct cpu_info *ci;
-	pri_t pri;
 
 	KASSERT(lwp_locked(l, sq->sq_mutex));
 	KASSERT(sq->sq_waiters > 0);
@@ -169,12 +161,6 @@ sleepq_remove(sleepq_t *sq, lwp_t *l)
 	l->l_slptime = 0;
 	if ((l->l_flag & LW_INMEM) != 0) {
 		sched_enqueue(l, false);
-		pri = lwp_eprio(l);
-		/* XXX This test is not good enough! */
-		if (pri > spc->spc_curpriority) {
-			cpu_need_resched(ci,
-			    (pri >= PRI_KERNEL ? RESCHED_IMMED : 0));
-		}
 		spc_unlock(ci);
 		return 0;
 	}
@@ -220,7 +206,7 @@ sleepq_enqueue(sleepq_t *sq, wchan_t wchan, const char *wmesg, syncobj_t *sobj)
 {
 	lwp_t *l = curlwp;
 
-	KASSERT(mutex_owned(sq->sq_mutex));
+	KASSERT(lwp_locked(l, sq->sq_mutex));
 	KASSERT(l->l_stat == LSONPROC);
 	KASSERT(l->l_wchan == NULL && l->l_sleepq == NULL);
 
@@ -282,7 +268,7 @@ sleepq_block(int timo, bool catch)
 			 * Even if the callout appears to have fired, we need to
 			 * stop it in order to synchronise with other CPUs.
 			 */
-			if (callout_halt(&l->l_timeout_ch))
+			if (callout_halt(&l->l_timeout_ch, NULL))
 				error = EWOULDBLOCK;
 		}
 	}
@@ -292,10 +278,10 @@ sleepq_block(int timo, bool catch)
 		if ((l->l_flag & (LW_CANCELLED | LW_WEXIT | LW_WCORE)) != 0)
 			error = EINTR;
 		else if ((l->l_flag & LW_PENDSIG) != 0) {
-			mutex_enter(&p->p_smutex);
+			mutex_enter(p->p_lock);
 			if ((sig = issignal(l)) != 0)
 				error = sleepq_sigtoerror(l, sig);
-			mutex_exit(&p->p_smutex);
+			mutex_exit(p->p_lock);
 		}
 	}
 
@@ -320,6 +306,7 @@ sleepq_wake(sleepq_t *sq, wchan_t wchan, u_int expected)
 
 	for (l = TAILQ_FIRST(&sq->sq_queue); l != NULL; l = next) {
 		KASSERT(l->l_sleepq == sq);
+		KASSERT(l->l_mutex == sq->sq_mutex);
 		next = TAILQ_NEXT(l, l_sleepchain);
 		if (l->l_wchan != wchan)
 			continue;
@@ -353,9 +340,8 @@ sleepq_unsleep(lwp_t *l, bool cleanup)
 	sleepq_t *sq = l->l_sleepq;
 	int swapin;
 
-	KASSERT(lwp_locked(l, NULL));
+	KASSERT(lwp_locked(l, sq->sq_mutex));
 	KASSERT(l->l_wchan != NULL);
-	KASSERT(l->l_mutex == sq->sq_mutex);
 
 	swapin = sleepq_remove(sq, l);
 
@@ -405,7 +391,7 @@ sleepq_sigtoerror(lwp_t *l, int sig)
 	struct proc *p = l->l_proc;
 	int error;
 
-	KASSERT(mutex_owned(&p->p_smutex));
+	KASSERT(mutex_owned(p->p_lock));
 
 	/*
 	 * If this sleep was canceled, don't let the syscall restart.

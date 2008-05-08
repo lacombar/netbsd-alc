@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipi_base.c,v 1.145 2007/07/09 21:01:21 ad Exp $	*/
+/*	$NetBSD: scsipi_base.c,v 1.147 2008/04/28 20:23:57 martin Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999, 2000, 2002, 2003, 2004 The NetBSD Foundation, Inc.
@@ -16,13 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -38,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: scsipi_base.c,v 1.145 2007/07/09 21:01:21 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: scsipi_base.c,v 1.147 2008/04/28 20:23:57 martin Exp $");
 
 #include "opt_scsi.h"
 
@@ -137,9 +130,8 @@ scsipi_channel_init(struct scsipi_channel *chan)
 	 */
 	if (kthread_create(PRI_NONE, 0, NULL, scsipi_completion_thread, chan,
 	    &chan->chan_thread, "%s", chan->chan_name)) {
-		printf("%s: unable to create completion thread for "
-		    "channel %d\n", adapt->adapt_dev->dv_xname,
-		    chan->chan_channel);
+		aprint_error_dev(adapt->adapt_dev, "unable to create completion thread for "
+		    "channel %d\n", chan->chan_channel);
 		panic("scsipi_channel_init");
 	}
 
@@ -2201,7 +2193,7 @@ scsipi_print_xfer_mode(struct scsipi_periph *periph)
 	if ((periph->periph_flags & PERIPH_MODE_VALID) == 0)
 		return;
 
-	aprint_normal("%s: ", periph->periph_dev->dv_xname);
+	aprint_normal_dev(periph->periph_dev, "");
 	if (periph->periph_mode & (PERIPH_CAP_SYNC | PERIPH_CAP_DT)) {
 		period = scsipi_sync_factor_to_period(periph->periph_period);
 		aprint_normal("sync (%d.%02dns offset %d)",

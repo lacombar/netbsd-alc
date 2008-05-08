@@ -1,4 +1,4 @@
-/*	$NetBSD: emul.c,v 1.36 2008/03/25 23:21:42 yamt Exp $	*/
+/*	$NetBSD: emul.c,v 1.38 2008/04/24 17:02:18 ad Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -57,8 +57,7 @@
 
 time_t time_second = 1;
 
-kmutex_t proclist_mutex;
-kmutex_t proclist_lock;
+kmutex_t *proc_lock;
 struct lwp lwp0;
 struct vnode *rootvp;
 struct device *root_device;
@@ -550,4 +549,10 @@ selnotify(struct selinfo *sip, int events, long knhint)
 void
 seldestroy(struct selinfo *sip)
 {
+}
+
+const char *
+device_xname(device_t dv)
+{
+	return "bogus0";
 }

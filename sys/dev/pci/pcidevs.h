@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs.h,v 1.933 2008/03/26 11:13:30 jmcneill Exp $	*/
+/*	$NetBSD: pcidevs.h,v 1.939 2008/04/30 12:23:55 joerg Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.932 2008/03/26 11:12:43 jmcneill Exp
+ *	NetBSD: pcidevs,v 1.938 2008/04/30 12:23:29 joerg Exp
  */
 
 /*
@@ -627,6 +627,7 @@
 #define	PCI_VENDOR_TURTLE_BEACH	0x5053		/* Turtle Beach */
 #define	PCI_VENDOR_S3	0x5333		/* S3 */
 #define	PCI_VENDOR_NETPOWER2	0x5700		/* NetPower (2nd PCI Vendor ID) */
+#define	PCI_VENDOR_XENSOURCE	0x5853		/* XenSource, Inc. */
 #define	PCI_VENDOR_C4T	0x6374		/* c't Magazin */
 #define	PCI_VENDOR_KURUSUGAWA	0x6809		/* Kurusugawa Electronics */
 #define	PCI_VENDOR_PCHDTV	0x7063		/* pcHDTV */
@@ -728,6 +729,8 @@
 #define	PCI_PRODUCT_3WARE_ESCALADE_ASIC	0x1001		/* Escalade ATA RAID 7000/8000 series Controller */
 #define	PCI_PRODUCT_3WARE_9000	0x1002		/* 9000-series RAID */
 #define	PCI_PRODUCT_3WARE_9550	0x1003		/* 9550-series RAID */
+#define	PCI_PRODUCT_3WARE_9650	0x1004		/* 9650-series RAID */
+#define	PCI_PRODUCT_3WARE_9690	0x1005		/* 9690-series RAID */
 
 /* AboCom products */
 #define	PCI_PRODUCT_ABOCOM_FE2500	0xab02		/* FE2500 10/100 Ethernet */
@@ -1450,6 +1453,7 @@
 #define	PCI_PRODUCT_BROADCOM_BCM4322	0x4322		/* BCM4322 */
 #define	PCI_PRODUCT_BROADCOM_BCM4309	0x4324		/* BCM4309 */
 #define	PCI_PRODUCT_BROADCOM_BCM43XG	0x4325		/* BCM43XG */
+#define	PCI_PRODUCT_BROADCOM_BCM4328	0x4328		/* BCM4328 802.11a/b/g/n */
 #define	PCI_PRODUCT_BROADCOM_BCM4401	0x4401		/* BCM4401 10/100 Ethernet */
 #define	PCI_PRODUCT_BROADCOM_5801	0x5801		/* 5801 Security processor */
 #define	PCI_PRODUCT_BROADCOM_5802	0x5802		/* 5802 Security processor */
@@ -1737,6 +1741,10 @@
 
 /* Diamond products */
 #define	PCI_PRODUCT_DIAMOND_VIPER	0x9001		/* Viper/PCI */
+
+/* Digi International Products */
+#define	PCI_PRODUCT_DIGI_NEO4	0x00b0		/* Neo 4-port */
+#define	PCI_PRODUCT_DIGI_NEO8	0x00b1		/* Neo 8-port */
 
 /* D-Link Systems products */
 #define	PCI_PRODUCT_DLINK_DL1002	0x1002		/* DL-1002 10/100 Ethernet */
@@ -3113,10 +3121,15 @@
 #define	PCI_PRODUCT_NVIDIA_MCP61_SATA3	0x03f7		/* nForce MCP61 Serial ATA Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP61_LAN3	0x03ee		/* nForce MCP61 Gigabit Ethernet Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP61_LAN4	0x03ef		/* nForce MCP61 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_GF_8400M_GS	0x0427		/* GeForce 8400M GS */
 #define	PCI_PRODUCT_NVIDIA_MCP65_ISA	0x0440		/* nForce MCP65 PCI-ISA Bridge */
+#define	PCI_PRODUCT_NVIDIA_MCP65_LPC1	0x0441		/* nForce MCP65 PCI-LPC Bridge */
+#define	PCI_PRODUCT_NVIDIA_MCP65_LPC2	0x0442		/* nForce MCP65 PCI-LPC Bridge */
+#define	PCI_PRODUCT_NVIDIA_MCP65_LPC3	0x0443		/* nForce MCP65 PCI-LPC Bridge */
 #define	PCI_PRODUCT_NVIDIA_MCP65_MEM	0x0444		/* nForce MCP65 Memory Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP65_MEM2	0x0445		/* nForce MCP65 Memory Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP65_SMB	0x0446		/* nForce MCP65 SMBus Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP65_SMU	0x0447		/* nForce MCP65 System Management Unit */
 #define	PCI_PRODUCT_NVIDIA_MCP65_IDE	0x0448		/* nForce MCP65 ATA133 IDE Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP65_PCI	0x0449		/* nForce MCP65 PCI Bridge */
 #define	PCI_PRODUCT_NVIDIA_MCP65_HDA_1	0x044a		/* nForce MCP65 High Definition Audio Controller */
@@ -3162,6 +3175,10 @@
 #define	PCI_PRODUCT_NVIDIA_MCP67_IDE	0x0560		/* nForce MCP67 ATA133 IDE Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP73_IDE	0x056c		/* nForce MCP73 ATA133 IDE Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_IDE	0x0759		/* nForce MCP77 ATA133 IDE Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP77_LAN1	0x0760		/* nForce MCP77 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP77_LAN2	0x0761		/* nForce MCP77 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP77_LAN3	0x0762		/* nForce MCP77 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP77_LAN4	0x0763		/* nForce MCP77 Gigabit Ethernet Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_HDA_1	0x0774		/* nForce MCP77 High Definition Audio Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_HDA_2	0x0775		/* nForce MCP77 High Definition Audio Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_HDA_3	0x0776		/* nForce MCP77 High Definition Audio Controller */
@@ -3185,6 +3202,10 @@
 #define	PCI_PRODUCT_NVIDIA_MCP73_AHCI_12	0x07fb		/* nForce MCP73 AHCI Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP73_HDA_1	0x07fc		/* nForce MCP73 High Definition Audio Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP73_HDA_2	0x07fd		/* nForce MCP73 High Definition Audio Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP79_LAN1	0x0ab0		/* nForce MCP79 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP79_LAN2	0x0ab1		/* nForce MCP79 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP79_LAN3	0x0ab2		/* nForce MCP79 Gigabit Ethernet Controller */
+#define	PCI_PRODUCT_NVIDIA_MCP79_LAN4	0x0ab3		/* nForce MCP79 Gigabit Ethernet Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_AHCI_1	0x0ad0		/* nForce MCP77 AHCI Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_AHCI_2	0x0ad1		/* nForce MCP77 AHCI Controller */
 #define	PCI_PRODUCT_NVIDIA_MCP77_AHCI_3	0x0ad2		/* nForce MCP77 AHCI Controller */
@@ -3359,6 +3380,7 @@
 #define	PCI_PRODUCT_RICOH_Rx5C832	0x0832		/* 5C832 PCI-SD/MMC/MMC+/MS/xD/Firewire */
 #define	PCI_PRODUCT_RICOH_Rx5C843	0x0843		/* 5C843 PCI-CardBus bridge/SD/MMC/MMC+/MS/xD/Firewire */
 #define	PCI_PRODUCT_RICOH_Rx5C847	0x0847		/* 5C847 PCI-CardBus bridge/SD/MMC/MMC+/MS/xD/Firewire */
+#define	PCI_PRODUCT_RICOH_RxDPCC	0x0852		/* xD-Picture Card Controller */
 #define	PCI_PRODUCT_RICOH_Rx5C853	0x0853		/* 5C853 PCI-CardBus bridge/SD/MMC/MMC+/MS/xD/SC/Firewire */
 
 /* RISCom (SDL Communications?) products */
@@ -4053,6 +4075,9 @@
 #define	PCI_PRODUCT_WORKBIT_NPATA32_CF32A	0xf021		/* CF32A CompactFlash Adapter */
 #define	PCI_PRODUCT_WORKBIT_NPATA32_CF32A_BUFFALO	0xf024		/* CF32A CF Adapter (BUFFALO) */
 #define	PCI_PRODUCT_WORKBIT_NPATA32_KME	0xf02c		/* NPATA-32 IDE (KME) */
+
+/* XenSource products */
+#define	PCI_PRODUCT_XENSOURCE_XENPLATFORM	0x0001		/* Xen Platform Device */
 
 /* Xircom products */
 /* is the `-3' here just indicating revision 3, or is it really part

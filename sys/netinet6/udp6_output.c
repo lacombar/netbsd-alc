@@ -1,4 +1,4 @@
-/*	$NetBSD: udp6_output.c,v 1.32 2008/01/14 04:16:46 dyoung Exp $	*/
+/*	$NetBSD: udp6_output.c,v 1.35 2008/04/15 04:43:25 thorpej Exp $	*/
 /*	$KAME: udp6_output.c,v 1.43 2001/10/15 09:19:52 itojun Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: udp6_output.c,v 1.32 2008/01/14 04:16:46 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: udp6_output.c,v 1.35 2008/04/15 04:43:25 thorpej Exp $");
 
 #include "opt_inet.h"
 
@@ -91,10 +91,12 @@ __KERNEL_RCSID(0, "$NetBSD: udp6_output.c,v 1.32 2008/01/14 04:16:46 dyoung Exp 
 #include <netinet/in_pcb.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#include <netinet/udp_private.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/udp6_var.h>
+#include <netinet6/udp6_private.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
@@ -360,7 +362,7 @@ udp6_output(struct in6pcb *in6p, struct mbuf *m, struct mbuf *addr6,
 		m->m_pkthdr.csum_flags = M_CSUM_UDPv6;
 		m->m_pkthdr.csum_data = offsetof(struct udphdr, uh_sum);
 
-		udp6stat.udp6s_opackets++;
+		UDP6_STATINC(UDP6_STAT_OPACKETS);
 		error = ip6_output(m, optp, &in6p->in6p_route, 0,
 		    in6p->in6p_moptions, in6p->in6p_socket, NULL);
 		break;
@@ -392,7 +394,7 @@ udp6_output(struct in6pcb *in6p, struct mbuf *m, struct mbuf *addr6,
 		ip->ip_ttl = in6_selecthlim(in6p, NULL); /* XXX */
 		ip->ip_tos = 0;	/* XXX */
 
-		udpstat.udps_opackets++;
+		UDP_STATINC(UDP_STAT_OPACKETS);
 		error = ip_output(m, NULL, &in6p->in6p_route, flags /* XXX */,
 		    (struct ip_moptions *)NULL,
 		    (struct socket *)in6p->in6p_socket);
