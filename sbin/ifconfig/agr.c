@@ -1,4 +1,4 @@
-/*	$NetBSD: agr.c,v 1.10 2008/05/07 23:55:06 dyoung Exp $	*/
+/*	$NetBSD: agr.c,v 1.15 2008/07/15 21:27:58 dyoung Exp $	*/
 
 /*-
  * Copyright (c)2005 YAMAMOTO Takashi,
@@ -28,7 +28,7 @@
 
 #include <sys/cdefs.h>
 #if !defined(lint)
-__RCSID("$NetBSD: agr.c,v 1.10 2008/05/07 23:55:06 dyoung Exp $");
+__RCSID("$NetBSD: agr.c,v 1.15 2008/07/15 21:27:58 dyoung Exp $");
 #endif /* !defined(lint) */
 
 #include <sys/param.h>
@@ -45,22 +45,27 @@ __RCSID("$NetBSD: agr.c,v 1.10 2008/05/07 23:55:06 dyoung Exp $");
 #include <stdlib.h>
 #include <util.h>
 
-#include "agr.h"
 #include "env.h"
 #include "extern.h"
 #include "parse.h"
 #include "util.h"
 
+static int agrsetport(prop_dictionary_t, prop_dictionary_t);
+static void agr_constructor(void) __attribute__((constructor));
 static int checkifname(prop_dictionary_t);
 static void assertifname(prop_dictionary_t);
 
+static struct piface agrif = PIFACE_INITIALIZER(&agrif, "agr interface",
+    agrsetport, "agrport", &command_root.pb_parser);
+
 static const struct kwinst agrkw[] = {
-	  {.k_word = "agrport", .k_type = KW_T_NUM, .k_neg = true,
-	   .k_num = AGRCMD_ADDPORT, .k_negnum = AGRCMD_REMPORT,
-	   .k_exec = agrsetport}
+	  {.k_word = "agrport", .k_type = KW_T_INT, .k_int = AGRCMD_ADDPORT,
+	   .k_nextparser = &agrif.pif_parser}
+	, {.k_word = "-agrport", .k_type = KW_T_INT, .k_int = AGRCMD_REMPORT,
+	   .k_nextparser = &agrif.pif_parser}
 };
 
-struct pkw agr = PKW_INITIALIZER(&agr, "agr", NULL, NULL,
+struct pkw agr = PKW_INITIALIZER(&agr, "agr", NULL, "agrcmd",
     agrkw, __arraycount(agrkw), NULL);
 
 static int
@@ -83,7 +88,7 @@ assertifname(prop_dictionary_t env)
 }
 
 int
-agrsetport(prop_dictionary_t env, prop_dictionary_t xenv)
+agrsetport(prop_dictionary_t env, prop_dictionary_t oenv)
 {
 	char buf[IFNAMSIZ];
 	struct agrreq ar;
@@ -115,7 +120,7 @@ agrsetport(prop_dictionary_t env, prop_dictionary_t xenv)
 	return 0;
 }
 
-void
+static void
 agr_status(prop_dictionary_t env, prop_dictionary_t oenv)
 {
 	struct agrreq ar;
@@ -166,4 +171,25 @@ again:
 		printf("\tagrport: %s, flags=%s\n", api->api_ifname, tmp);
 		api++;
 	}
+}
+
+static status_func_t status;
+static usage_func_t usage;
+static cmdloop_branch_t branch;
+
+static void
+agr_usage(prop_dictionary_t env)
+{
+	fprintf(stderr, "\t[ agrport i ] [ -agrport i ]\n");
+}
+
+static void
+agr_constructor(void)
+{
+	status_func_init(&status, agr_status);
+	usage_func_init(&usage, agr_usage);
+	register_status(&status);
+	register_usage(&usage);
+	cmdloop_branch_init(&branch, &agr.pk_parser);
+	register_cmdloop_branch(&branch);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: genfs_io.c,v 1.8 2008/01/02 15:44:03 pooka Exp $	*/
+/*	$NetBSD: genfs_io.c,v 1.11 2008/07/15 15:04:42 pooka Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -299,7 +299,7 @@ genfs_do_putpages(struct vnode *vp, off_t startoff, off_t endoff, int flags,
 	/* check if all pages are clean */
 	smallest = -1;
 	for (pg = TAILQ_FIRST(&uobj->memq); pg; pg = pg_next) {
-		pg_next = TAILQ_NEXT(pg, listq);
+		pg_next = TAILQ_NEXT(pg, listq.queue);
 
 		/*
 		 * XXX: this is not correct at all.  But it's based on
@@ -310,7 +310,8 @@ genfs_do_putpages(struct vnode *vp, off_t startoff, off_t endoff, int flags,
 		 */
 		KASSERT((pg->flags & PG_BUSY) == 0);
 
-		if (pg->flags & PG_CLEAN) {
+		/* If we can just dump the page, do so */
+		if (pg->flags & PG_CLEAN || flags & PGO_FREE) {
 			uvm_pagefree(pg);
 			continue;
 		}
@@ -437,6 +438,13 @@ genfs_compat_gop_write(struct vnode *vp, struct vm_page **pgs,
 
 int
 genfs_gop_write(struct vnode *vp, struct vm_page **pgs, int npages, int flags)
+{
+
+	panic("%s: not implemented", __func__);
+}
+
+int
+genfs_gop_write_rwmap(struct vnode *vp, struct vm_page **pgs, int npages, int flags)
 {
 
 	panic("%s: not implemented", __func__);

@@ -1,4 +1,4 @@
-/*	$NetBSD: fpu.c,v 1.24 2008/04/30 00:16:30 cegger Exp $	*/
+/*	$NetBSD: fpu.c,v 1.26 2008/06/29 21:00:08 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.24 2008/04/30 00:16:30 cegger Exp $");
+__KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.26 2008/06/29 21:00:08 bouyer Exp $");
 
 #include "opt_multiprocessor.h"
 
@@ -101,6 +101,12 @@ __KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.24 2008/04/30 00:16:30 cegger Exp $");
 #include <dev/isa/isavar.h>
 #endif
 
+#ifdef XEN
+#define clts() HYPERVISOR_fpu_taskswitch(0)
+#define stts() HYPERVISOR_fpu_taskswitch(1)
+#endif
+
+
 /*
  * We do lazy initialization and switching using the TS bit in cr0 and the
  * MDP_USEDFPU bit in mdproc.
@@ -122,6 +128,7 @@ __KERNEL_RCSID(0, "$NetBSD: fpu.c,v 1.24 2008/04/30 00:16:30 cegger Exp $");
 void fpudna(struct cpu_info *);
 static int x86fpflags_to_ksiginfo(uint32_t);
 
+#ifndef XEN
 /*
  * Init the FPU.
  */
@@ -132,6 +139,7 @@ fpuinit(struct cpu_info *ci)
 	fninit();
 	lcr0(rcr0() | (CR0_TS));
 }
+#endif
 
 /*
  * Record the FPU state and reinitialize it all except for the control word.
@@ -150,6 +158,9 @@ fputrap(frame)
 	uint32_t mxcsr, statbits;
 	uint16_t cw;
 	ksiginfo_t ksi;
+
+	kpreempt_disable();
+	x86_enable_intr();
 
 	/*
 	 * At this point, fpcurlwp should be curlwp.  If it wasn't, the TS bit
@@ -172,6 +183,8 @@ fputrap(frame)
 		fwait();
 		statbits = sfp->fp_fxsave.fx_fsw;
 	}
+	kpreempt_enable();
+
 	sfp->fp_ex_tw = sfp->fp_fxsave.fx_ftw;
 	sfp->fp_ex_sw = sfp->fp_fxsave.fx_fsw;
 	KSI_INIT_TRAP(&ksi);
@@ -224,6 +237,9 @@ fpudna(struct cpu_info *ci)
 		return;
 	}
 
+	kpreempt_disable();
+	x86_enable_intr();
+
 	s = splipi();
 	l = ci->ci_curlwp;
 
@@ -231,6 +247,20 @@ fpudna(struct cpu_info *ci)
 	 * Initialize the FPU state to clear any exceptions.  If someone else
 	 * was using the FPU, save their state.
 	 */
+#ifdef XEN
+	/*
+	 * it seems we can get there on Xen even if we didn't switch lwp.
+	 * in this case do nothing
+	 */
+	if (ci->ci_fpcurlwp == l) {
+		KDASSERT(l->l_addr->u_pcb.pcb_fpcpu == ci);
+		splx(s);
+		l->l_addr->u_pcb.pcb_cr0 &= ~CR0_TS;
+		clts();
+		kpreempt_enable();
+		return;
+	}
+#endif
 	KDASSERT(ci->ci_fpcurlwp != l);
 	if (ci->ci_fpcurlwp != 0)
 		fpusave_cpu(true);
@@ -283,6 +313,8 @@ fpudna(struct cpu_info *ci)
 		fldummy(&zero);
 		fxrstor(&l->l_addr->u_pcb.pcb_savefpu);
 	}
+
+	kpreempt_enable();
 }
 
 
@@ -292,6 +324,8 @@ fpusave_cpu(bool save)
 	struct cpu_info *ci = curcpu();
 	struct lwp *l;
 	int s;
+
+	KASSERT(kpreempt_disabled());
 
 	l = ci->ci_fpcurlwp;
 	if (l == NULL)
@@ -332,6 +366,7 @@ fpusave_lwp(struct lwp *l, bool save)
 
 	KDASSERT(l->l_addr != NULL);
 
+	kpreempt_disable();
 	oci = l->l_addr->u_pcb.pcb_fpcpu;
 	if (oci == curcpu()) {
 		int s = splipi();
@@ -354,4 +389,5 @@ fpusave_lwp(struct lwp *l, bool save)
 		}
 #endif
 	}
+	kpreempt_enable();
 }

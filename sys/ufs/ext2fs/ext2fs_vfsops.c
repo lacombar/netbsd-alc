@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_vfsops.c,v 1.134 2008/05/06 18:43:45 ad Exp $	*/
+/*	$NetBSD: ext2fs_vfsops.c,v 1.137 2008/06/28 01:34:05 rumble Exp $	*/
 
 /*
  * Copyright (c) 1989, 1991, 1993, 1994
@@ -65,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.134 2008/05/06 18:43:45 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.137 2008/06/28 01:34:05 rumble Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -92,6 +92,7 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.134 2008/05/06 18:43:45 ad Exp $
 #include <sys/lock.h>
 #include <sys/conf.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/specfs/specdev.h>
@@ -106,10 +107,14 @@ __KERNEL_RCSID(0, "$NetBSD: ext2fs_vfsops.c,v 1.134 2008/05/06 18:43:45 ad Exp $
 #include <ufs/ext2fs/ext2fs_dir.h>
 #include <ufs/ext2fs/ext2fs_extern.h>
 
+MODULE(MODULE_CLASS_VFS, ext2fs, NULL);
+
 extern kmutex_t ufs_hashlock;
 
 int ext2fs_sbupdate(struct ufsmount *, int);
 static int ext2fs_checksb(struct ext2fs *, int);
+
+static struct sysctllog *ext2fs_sysctl_log;
 
 extern const struct vnodeopv_desc ext2fs_vnodeop_opv_desc;
 extern const struct vnodeopv_desc ext2fs_specop_opv_desc;
@@ -149,7 +154,6 @@ struct vfsops ext2fs_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(ext2fs_vfsops);
 
 static const struct genfs_ops ext2fs_genfsops = {
 	.gop_size = genfs_size,
@@ -163,6 +167,47 @@ static const struct ufs_ops ext2fs_ufsops = {
 	.uo_update = ext2fs_update,
 	.uo_vfree = ext2fs_vfree,
 };
+
+static int
+ext2fs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&ext2fs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&ext2fs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&ext2fs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "ext2fs",
+			       SYSCTL_DESCR("Linux EXT2FS file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 17, CTL_EOL);
+		/*
+		 * XXX the "17" above could be dynamic, thereby eliminating
+		 * one more instance of the "number to vfs" mapping problem,
+		 * but "17" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&ext2fs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&ext2fs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}
 
 /*
  * XXX Same structure as FFS inodes?  Should we share a common pool?
@@ -484,7 +529,7 @@ ext2fs_reload(struct mount *mountp, kauth_cred_t cred)
 		size = DEV_BSIZE;
 	else
 		size = dpart.disklab->d_secsize;
-	error = bread(devvp, (daddr_t)(SBOFF / size), SBSIZE, NOCRED, &bp);
+	error = bread(devvp, (daddr_t)(SBOFF / size), SBSIZE, NOCRED, 0, &bp);
 	if (error) {
 		brelse(bp, 0);
 		return (error);
@@ -523,7 +568,7 @@ ext2fs_reload(struct mount *mountp, kauth_cred_t cred)
 		error = bread(devvp ,
 		    fsbtodb(fs, fs->e2fs.e2fs_first_dblock +
 		    1 /* superblock */ + i),
-		    fs->e2fs_bsize, NOCRED, &bp);
+		    fs->e2fs_bsize, NOCRED, 0, &bp);
 		if (error) {
 			brelse(bp, 0);
 			return (error);
@@ -572,7 +617,7 @@ loop:
 		 */
 		ip = VTOI(vp);
 		error = bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
-		    (int)fs->e2fs_bsize, NOCRED, &bp);
+		    (int)fs->e2fs_bsize, NOCRED, 0, &bp);
 		if (error) {
 			vput(vp);
 			mutex_enter(&mntvnode_lock);
@@ -632,7 +677,7 @@ ext2fs_mountfs(struct vnode *devvp, struct mount *mp)
 	printf("sb size: %d ino size %d\n", sizeof(struct ext2fs),
 	    EXT2_DINODE_SIZE);
 #endif
-	error = bread(devvp, (SBOFF / size), SBSIZE, cred, &bp);
+	error = bread(devvp, (SBOFF / size), SBSIZE, cred, 0, &bp);
 	if (error)
 		goto out;
 	fs = (struct ext2fs *)bp->b_data;
@@ -679,7 +724,7 @@ ext2fs_mountfs(struct vnode *devvp, struct mount *mp)
 		error = bread(devvp ,
 		    fsbtodb(m_fs, m_fs->e2fs.e2fs_first_dblock +
 		    1 /* superblock */ + i),
-		    m_fs->e2fs_bsize, NOCRED, &bp);
+		    m_fs->e2fs_bsize, NOCRED, 0, &bp);
 		if (error) {
 			free(m_fs->e2fs_gd, M_UFSMNT);
 			goto out;
@@ -996,7 +1041,7 @@ retry:
 
 	/* Read in the disk contents for the inode, copy into the inode. */
 	error = bread(ump->um_devvp, fsbtodb(fs, ino_to_fsba(fs, ino)),
-	    (int)fs->e2fs_bsize, NOCRED, &bp);
+	    (int)fs->e2fs_bsize, NOCRED, 0, &bp);
 	if (error) {
 
 		/*
@@ -1122,27 +1167,6 @@ ext2fs_vptofh(struct vnode *vp, struct fid *fhp, size_t *fh_size)
 	ufh.ufid_gen = ip->i_e2fs_gen;
 	memcpy(fhp, &ufh, sizeof(ufh));
 	return (0);
-}
-
-SYSCTL_SETUP(sysctl_vfs_ext2fs_setup, "sysctl vfs.ext2fs subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "ext2fs",
-		       SYSCTL_DESCR("Linux EXT2FS file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 17, CTL_EOL);
-	/*
-	 * XXX the "17" above could be dynamic, thereby eliminating
-	 * one more instance of the "number to vfs" mapping problem,
-	 * but "17" is the order as taken from sys/mount.h
-	 */
 }
 
 /*

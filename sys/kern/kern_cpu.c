@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_cpu.c,v 1.30 2008/05/06 18:40:57 ad Exp $	*/
+/*	$NetBSD: kern_cpu.c,v 1.34 2008/07/14 01:27:15 rmind Exp $	*/
 
 /*-
  * Copyright (c) 2007, 2008 The NetBSD Foundation, Inc.
@@ -57,7 +57,7 @@
 
 #include <sys/cdefs.h>
 
-__KERNEL_RCSID(0, "$NetBSD: kern_cpu.c,v 1.30 2008/05/06 18:40:57 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_cpu.c,v 1.34 2008/07/14 01:27:15 rmind Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -113,7 +113,6 @@ mi_cpu_attach(struct cpu_info *ci)
 	__cpu_simple_lock_init(&ci->ci_data.cpu_ld_lock);
 
 	sched_cpuattach(ci);
-	uvm_cpu_attach(ci);
 
 	error = create_idle_lwp(ci);
 	if (error != 0) {
@@ -268,38 +267,30 @@ cpu_xc_offline(struct cpu_info *ci)
 
 	/*
 	 * Migrate all non-bound threads to the other CPU.
+	 *
 	 * Please note, that this runs from the xcall thread, thus handling
-	 * of LSONPROC is not needed.
+	 * of LSONPROC is not needed.  Threads which change the state will
+	 * be handled by sched_takecpu().
 	 */
 	mutex_enter(proc_lock);
-
-	/*
-	 * Note that threads on the runqueue might sleep after this, but
-	 * sched_takecpu() would migrate such threads to the appropriate CPU.
-	 */
-	LIST_FOREACH(l, &alllwp, l_list) {
-		lwp_lock(l);
-		if (l->l_cpu == ci && (l->l_stat == LSSLEEP ||
-		    l->l_stat == LSSTOP || l->l_stat == LSSUSPENDED)) {
-			KASSERT((l->l_flag & LW_RUNNING) == 0);
-			l->l_cpu = mci;
-		}
-		lwp_unlock(l);
-	}
-
-	/* Double-lock the run-queues */
 	spc_dlock(ci, mci);
-
-	/* Handle LSRUN and LSIDL cases */
 	LIST_FOREACH(l, &alllwp, l_list) {
-		if (l->l_cpu != ci || (l->l_pflag & LP_BOUND))
+		/*
+		 * Since runqueues are locked - LWPs cannot be enqueued (and
+		 * cannot change the state), thus is safe to perform the
+		 * checks without locking each LWP.
+		 */
+		if (l->l_cpu != ci || (l->l_pflag & LP_BOUND) != 0 ||
+		    l->l_stat != LSRUN)
 			continue;
-		if (l->l_stat == LSRUN && (l->l_flag & LW_INMEM) != 0) {
+		/* At this point, we are sure about the state of LWP */
+		KASSERT(lwp_locked(l, spc->spc_mutex));
+		if ((l->l_flag & LW_INMEM) != 0) {
 			sched_dequeue(l);
 			l->l_cpu = mci;
 			lwp_setlock(l, mspc->spc_mutex);
 			sched_enqueue(l, false);
-		} else if (l->l_stat == LSRUN || l->l_stat == LSIDL) {
+		} else {
 			l->l_cpu = mci;
 			lwp_setlock(l, mspc->spc_mutex);
 		}
@@ -347,9 +338,16 @@ cpu_setonline(struct cpu_info *ci, bool online)
 		if ((spc->spc_flags & SPCF_OFFLINE) != 0)
 			return 0;
 		nonline = 0;
+		/*
+		 * Ensure that at least one CPU within the processor set
+		 * stays online.  Revisit this later.
+		 */
 		for (CPU_INFO_FOREACH(cii, ci2)) {
-			nonline += ((ci2->ci_schedstate.spc_flags &
-			    SPCF_OFFLINE) == 0);
+			if ((ci2->ci_schedstate.spc_flags & SPCF_OFFLINE) != 0)
+				continue;
+			if (ci2->ci_schedstate.spc_psid != spc->spc_psid)
+				continue;
+			nonline++;
 		}
 		if (nonline == 1)
 			return EBUSY;

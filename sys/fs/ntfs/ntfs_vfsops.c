@@ -1,4 +1,4 @@
-/*	$NetBSD: ntfs_vfsops.c,v 1.69 2008/05/06 18:43:44 ad Exp $	*/
+/*	$NetBSD: ntfs_vfsops.c,v 1.72 2008/06/28 01:34:05 rumble Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 Semen Ustimenko
@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.69 2008/05/06 18:43:44 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.72 2008/06/28 01:34:05 rumble Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,6 +45,7 @@ __KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.69 2008/05/06 18:43:44 ad Exp $");
 #include <sys/device.h>
 #include <sys/conf.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -57,6 +58,8 @@ __KERNEL_RCSID(0, "$NetBSD: ntfs_vfsops.c,v 1.69 2008/05/06 18:43:44 ad Exp $");
 #include <fs/ntfs/ntfs_vfsops.h>
 #include <fs/ntfs/ntfs_ihash.h>
 #include <fs/ntfs/ntfsmount.h>
+
+MODULE(MODULE_CLASS_VFS, ntfs, NULL);
 
 MALLOC_JUSTDEFINE(M_NTFSMNT, "NTFS mount", "NTFS mount structure");
 MALLOC_JUSTDEFINE(M_NTFSNTNODE,"NTFS ntnode",  "NTFS ntnode information");
@@ -86,26 +89,7 @@ static const struct genfs_ops ntfs_genfsops = {
 	.gop_write = genfs_compat_gop_write,
 };
 
-SYSCTL_SETUP(sysctl_vfs_ntfs_setup, "sysctl vfs.ntfs subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "ntfs",
-		       SYSCTL_DESCR("NTFS file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 20, CTL_EOL);
-	/*
-	 * XXX the "20" above could be dynamic, thereby eliminating
-	 * one more instance of the "number to vfs" mapping problem,
-	 * but "20" is the order as taken from sys/mount.h
-	 */
-}
+static struct sysctllog *ntfs_sysctl_log;
 
 static int
 ntfs_mountroot()
@@ -347,7 +331,7 @@ ntfs_mountfs(devvp, mp, argsp, l)
 
 	bp = NULL;
 
-	error = bread(devvp, BBLOCK, BBSIZE, NOCRED, &bp);
+	error = bread(devvp, BBLOCK, BBSIZE, NOCRED, 0, &bp);
 	if (error)
 		goto out;
 	ntmp = malloc( sizeof *ntmp, M_NTFSMNT, M_WAITOK );
@@ -890,4 +874,44 @@ struct vfsops ntfs_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(ntfs_vfsops);
+
+static int
+ntfs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&ntfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&ntfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&ntfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "ntfs",
+			       SYSCTL_DESCR("NTFS file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 20, CTL_EOL);
+		/*
+		 * XXX the "20" above could be dynamic, thereby eliminating
+		 * one more instance of the "number to vfs" mapping problem,
+		 * but "20" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&ntfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&ntfs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}

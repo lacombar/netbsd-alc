@@ -1,4 +1,4 @@
-/*	$NetBSD: cd.c,v 1.279 2008/05/08 12:57:19 reinoud Exp $	*/
+/*	$NetBSD: cd.c,v 1.282 2008/06/12 23:06:14 cegger Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001, 2003, 2004, 2005, 2008 The NetBSD Foundation,
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cd.c,v 1.279 2008/05/08 12:57:19 reinoud Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cd.c,v 1.282 2008/06/12 23:06:14 cegger Exp $");
 
 #include "rnd.h"
 
@@ -89,6 +89,8 @@ __KERNEL_RCSID(0, "$NetBSD: cd.c,v 1.279 2008/05/08 12:57:19 reinoud Exp $");
 #include <dev/scsipi/scsipi_base.h>
 #include <dev/scsipi/cdvar.h>
 
+#include <prop/proplib.h>
+
 #define	CDUNIT(z)			DISKUNIT(z)
 #define	CDPART(z)			DISKPART(z)
 #define	CDMINOR(unit, part)		DISKMINOR(unit, part)
@@ -105,6 +107,9 @@ __KERNEL_RCSID(0, "$NetBSD: cd.c,v 1.279 2008/05/08 12:57:19 reinoud Exp $");
 #define CD_TOC_PMA	3	/* PMA, used as intermediate (rare use)   */
 #define CD_TOC_ATIP	4	/* pressed space of recordable		  */
 #define CD_TOC_CDTEXT	5	/* special CD-TEXT, rarely used		  */
+
+#define P5LEN	0x32
+#define MS5LEN	(P5LEN + 8 + 2)
 
 struct cd_formatted_toc {
 	struct ioc_toc_header header;
@@ -172,6 +177,8 @@ static int	mmc_getdiscinfo(struct scsipi_periph *, struct mmc_discinfo *);
 static int	mmc_gettrackinfo(struct scsipi_periph *, struct mmc_trackinfo *);
 static int	mmc_do_op(struct scsipi_periph *, struct mmc_op *);
 static int	mmc_setup_writeparams(struct scsipi_periph *, struct mmc_writeparams *);
+
+static void	cd_set_properties(struct cd_softc *);
 
 CFATTACH_DECL_NEW(cd, sizeof(struct cd_softc), cdmatch, cdattach, cddetach,
     cdactivate);
@@ -473,6 +480,8 @@ cdopen(dev_t dev, int flag, int fmt, struct lwp *l)
 			/* Fabricate a disk label. */
 			cdgetdisklabel(cd);
 			SC_DEBUG(periph, SCSIPI_DB3, ("Disklabel fabricated "));
+
+			cd_set_properties(cd);
 		}
 	}
 
@@ -925,7 +934,7 @@ cdbounce(struct buf *bp)
 	struct cdbounce *bounce = (struct cdbounce *)bp->b_private;
 	struct buf *obp = bounce->obp;
 	struct cd_softc *cd =
-	    device_private(cd_cd.cd_devs[CDUNIT(obp->b_dev)]);
+	    device_lookup_private(&cd_cd, CDUNIT(obp->b_dev));
 	struct disklabel *lp = cd->sc_dk.dk_label;
 
 	if (bp->b_error != 0) {
@@ -3583,9 +3592,7 @@ mmc_do_closetrack(struct scsipi_periph *periph, struct mmc_op *mmc_op)
 static int
 mmc_do_close_or_finalise(struct scsipi_periph *periph, struct mmc_op *mmc_op)
 {
-	int p5len  = 0x32;
-	int ms5len = p5len + 8 + 2;
-	uint8_t blob[ms5len], *page5;
+	uint8_t blob[MS5LEN], *page5;
 	int mmc_profile = mmc_op->mmc_profile;
 	int func, close, flags;
 	int error;
@@ -3596,12 +3603,12 @@ mmc_do_close_or_finalise(struct scsipi_periph *periph, struct mmc_op *mmc_op)
 	case 0x09 : /* CD-R       */
 	case 0x0a : /* CD-RW      */
 		/* Special case : need to update MS field in mode page 5 */
-		memset(blob, 0, ms5len);
+		memset(blob, 0, sizeof(blob));
 		page5 = blob+8;
 
 		flags = XS_CTL_DATA_IN | XS_CTL_DATA_ONSTACK;
 		error = scsipi_mode_sense_big(periph, SMS_PF, 5,
-		    (void *)blob, ms5len, flags, CDRETRIES, 20000);
+		    (void *)blob, sizeof(blob), flags, CDRETRIES, 20000);
 		if (error)
 			return error;
 
@@ -3612,7 +3619,7 @@ mmc_do_close_or_finalise(struct scsipi_periph *periph, struct mmc_op *mmc_op)
 
 		flags = XS_CTL_DATA_OUT | XS_CTL_DATA_ONSTACK;
 		error = scsipi_mode_select_big(periph, SMS_PF,
-		    (void *)blob, ms5len, flags, CDRETRIES, 20000);
+		    (void *)blob, sizeof(blob), flags, CDRETRIES, 20000);
 		if (error)
 			return error;
 		/* and use funtion 2 */
@@ -3772,9 +3779,7 @@ mmc_setup_writeparams(struct scsipi_periph *periph,
 		      struct mmc_writeparams *mmc_writeparams)
 {
 	struct mmc_trackinfo trackinfo;
-	int p5len  = 0x32;
-	int ms5len = p5len + 8 + 2;
-	uint8_t blob[ms5len];
+	uint8_t blob[MS5LEN];
 	uint8_t *page5;
 	int flags, error;
 	int track_mode, data_mode;
@@ -3783,18 +3788,18 @@ mmc_setup_writeparams(struct scsipi_periph *periph,
 	if (mmc_writeparams->mmc_class != MMC_CLASS_CD)
 		return 0;
 
-	memset(blob, 0, ms5len);
+	memset(blob, 0, sizeof(blob));
 	page5 = blob+8;
 
 	/* read mode page 5 (with header) */
 	flags = XS_CTL_DATA_IN | XS_CTL_DATA_ONSTACK;
-	error = scsipi_mode_sense_big(periph, SMS_PF, 5, (void *)blob, ms5len,
-	    flags, CDRETRIES, 20000);
+	error = scsipi_mode_sense_big(periph, SMS_PF, 5, (void *)blob,
+	    sizeof(blob), flags, CDRETRIES, 20000);
 	if (error)
 		return error;
 
 	/* set page length for reasurance */
-	page5[1] = p5len;	/* page length */
+	page5[1] = P5LEN;	/* page length */
 
 	/* write type packet/incremental */
 	page5[2] &= 0xf0;
@@ -3850,11 +3855,42 @@ mmc_setup_writeparams(struct scsipi_periph *periph,
 
 	/* write out updated mode page 5 (with header) */
 	flags = XS_CTL_DATA_OUT | XS_CTL_DATA_ONSTACK;
-	error = scsipi_mode_select_big(periph, SMS_PF, (void *)blob, ms5len,
-	    flags, CDRETRIES, 20000);
+	error = scsipi_mode_select_big(periph, SMS_PF, (void *)blob,
+	    sizeof(blob), flags, CDRETRIES, 20000);
 	if (error)
 		return error;
 
 	return 0;
 }
 
+static void
+cd_set_properties(struct cd_softc *cd)
+{
+	prop_dictionary_t disk_info, odisk_info, geom;
+
+	disk_info = prop_dictionary_create();
+
+	geom = prop_dictionary_create();
+
+	prop_dictionary_set_uint64(geom, "sectors-per-unit",
+	    cd->params.disksize);
+
+	prop_dictionary_set_uint32(geom, "sector-size",
+	    cd->params.blksize);
+
+	prop_dictionary_set(disk_info, "geometry", geom);
+	prop_object_release(geom);
+
+	prop_dictionary_set(device_properties(cd->sc_dev),
+	    "disk-info", disk_info);
+
+	/*
+	 * Don't release disk_info here; we keep a reference to it.
+	 * disk_detach() will release it when we go away.
+	 */
+
+	odisk_info = cd->sc_dk.dk_info;
+	cd->sc_dk.dk_info = disk_info;
+	if (odisk_info)
+		prop_object_release(odisk_info);
+}

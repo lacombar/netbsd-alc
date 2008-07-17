@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.938 2008/04/30 12:23:56 joerg Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.943 2008/07/15 22:27:31 tonnerre Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.938 2008/04/30 12:23:29 joerg Exp
+ *	NetBSD: pcidevs,v 1.943 2008/07/15 22:26:42 tonnerre Exp
  */
 
 /*
@@ -3672,8 +3672,36 @@ static const struct pci_product pci_products[] = {
 	    "GMAC Ethernet",
 	},
 	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA,
+	    "Shasta",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_ATA,
+	    "Shasta ATA",
+	},
+	{
 	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_GMAC,
 	    "Shasta GMAC",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_FW,
+	    "Shasta Firewire",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_PCI1,
+	    "Shasta PCI",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_PCI2,
+	    "Shasta PCI",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_PCI3,
+	    "Shasta PCI",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_SHASTA_HT,
+	    "Shasta HyperTransport",
 	},
 	{
 	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_INTREPID2_AGP,
@@ -4050,6 +4078,10 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_SB600_USB_OHCI4,
 	    "SB600 USB OHCI4 Controller",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_SB600_AC97_MODEM,
+	    "SB600 AC97 Modem",
 	},
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_IXP_IDE_600,
@@ -4676,6 +4708,10 @@ static const struct pci_product pci_products[] = {
 	    "Radeon Xpress 200G Series",
 	},
 	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_NB,
+	    "RD790 Northbridge (dual slot)",
+	},
+	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RADEON_RV280_5960,
 	    "Radeon 9200PRO 5960",
 	},
@@ -4794,6 +4830,30 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RADEON_RS300_7835,
 	    "Radeon 9200 IGP",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS690_HB,
+	    "RS690 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS690_PPB_7912,
+	    "RS690 PCI to PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS690_PPB_7913,
+	    "RS690 PCI to PCI-Express Port 0 Bridge",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS690_PPB_7915,
+	    "RS690 PCI to PCI-Express Port 1 Bridge",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS690_PPB_7916,
+	    "RS690 PCI to PCI-Express Port 2 Bridge",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS690_PPB_7917,
+	    "RS690 PCI to PCI-Express Port 3 Bridge",
 	},
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RADEON_HD2600_XT,
@@ -7064,6 +7124,10 @@ static const struct pci_product pci_products[] = {
 	    "GXT-135P Graphics Adapter",
 	},
 	{
+	    PCI_VENDOR_IBM, PCI_PRODUCT_IBM_SERVERAID8K,
+	    "ServeRAID 8k",
+	},
+	{
 	    PCI_VENDOR_IBM, PCI_PRODUCT_IBM_MPIC2,
 	    "MPIC-II",
 	},
@@ -8878,6 +8942,10 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82965PM_HB,
 	    "82965PM Host Bridge",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_80862A01,
+	    "80862A01 Mobile PCI Express Root Port",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82965PM_IGD,
@@ -10916,6 +10984,10 @@ static const struct pci_product pci_products[] = {
 	    "GeForce 8400M GS",
 	},
 	{
+	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_QUADRO_NVS140M,
+	    "Quadro NVS 140M",
+	},
+	{
 	    PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_MCP65_ISA,
 	    "nForce MCP65 PCI-ISA Bridge",
 	},
@@ -12462,6 +12534,10 @@ static const struct pci_product pci_products[] = {
 	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_755,
 	    "755 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_756,
+	    "756 Host Bridge",
 	},
 	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_760,
@@ -14184,4 +14260,4 @@ static const struct pci_product pci_products[] = {
 	    "Video Controller",
 	},
 };
-const int pci_nproducts = 2946;
+const int pci_nproducts = 2965;

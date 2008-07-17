@@ -1,4 +1,4 @@
-/*	$NetBSD: advfsops.c,v 1.50 2008/04/29 18:18:08 ad Exp $	*/
+/*	$NetBSD: advfsops.c,v 1.53 2008/06/28 01:34:05 rumble Exp $	*/
 
 /*
  * Copyright (c) 1994 Christian E. Hopps
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: advfsops.c,v 1.50 2008/04/29 18:18:08 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: advfsops.c,v 1.53 2008/06/28 01:34:05 rumble Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -58,9 +58,14 @@ __KERNEL_RCSID(0, "$NetBSD: advfsops.c,v 1.50 2008/04/29 18:18:08 ad Exp $");
 #include <sys/conf.h>
 #include <sys/kauth.h>
 #include <sys/simplelock.h>
+#include <sys/module.h>
 #include <fs/adosfs/adosfs.h>
 
+MODULE(MODULE_CLASS_VFS, adosfs, NULL);
+
 VFS_PROTOS(adosfs);
+
+static struct sysctllog *adosfs_sysctl_log;
 
 int adosfs_mountfs __P((struct vnode *, struct mount *, struct lwp *));
 int adosfs_loadbitmap __P((struct adosfsmount *));
@@ -210,7 +215,7 @@ adosfs_mountfs(devvp, mp, l)
 
 	bp = NULL;
 	if ((error = bread(devvp, (daddr_t)BBOFF,
-			   amp->bsize, NOCRED, &bp)) != 0) {
+			   amp->bsize, NOCRED, 0, &bp)) != 0) {
 		brelse(bp, 0);
 		goto fail;
 	}
@@ -395,7 +400,7 @@ adosfs_vget(mp, an, vpp)
 	adosfs_ainshash(amp, ap);
 
 	if ((error = bread(amp->devvp, an * amp->bsize / DEV_BSIZE,
-			   amp->bsize, NOCRED, &bp)) != 0) {
+			   amp->bsize, NOCRED, 0, &bp)) != 0) {
 		brelse(bp, 0);
 		vput(vp);
 		return (error);
@@ -515,7 +520,7 @@ adosfs_vget(mp, an, vpp)
 		brelse(bp, 0);
 		bp = NULL;
 		error = bread(amp->devvp, ap->linkto * amp->bsize / DEV_BSIZE,
-		    amp->bsize, NOCRED, &bp);
+		    amp->bsize, NOCRED, 0, &bp);
 		if (error) {
 			brelse(bp, 0);
 			vput(vp);
@@ -597,7 +602,7 @@ adosfs_loadbitmap(amp)
 	bp = mapbp = NULL;
 	bn = amp->rootb;
 	if ((error = bread(amp->devvp, bn * amp->bsize / DEV_BSIZE, amp->bsize,
-	    NOCRED, &bp)) != 0) {
+	    NOCRED, 0, &bp)) != 0) {
 		brelse(bp, 0);
 		return (error);
 	}
@@ -615,7 +620,7 @@ adosfs_loadbitmap(amp)
 			brelse(mapbp, 0);
 		if ((error = bread(amp->devvp,
 		    adoswordn(bp, blkix) * amp->bsize / DEV_BSIZE, amp->bsize,
-		     NOCRED, &mapbp)) != 0)
+		     NOCRED, 0, &mapbp)) != 0)
 			break;
 		if (adoscksum(mapbp, amp->nwords)) {
 #ifdef DIAGNOSTIC
@@ -642,7 +647,7 @@ adosfs_loadbitmap(amp)
 			bn = adoswordn(bp, blkix);
 			brelse(bp, 0);
 			if ((error = bread(amp->devvp, bn * amp->bsize / DEV_BSIZE,
-			    amp->bsize, NOCRED, &bp)) != 0)
+			    amp->bsize, NOCRED, 0, &bp)) != 0)
 				break;
 			/*
 			 * Why is there no checksum on these blocks?
@@ -775,27 +780,6 @@ adosfs_done()
 	malloc_type_detach(M_ADOSFSMNT);
 }
 
-SYSCTL_SETUP(sysctl_vfs_adosfs_setup, "sysctl vfs.adosfs subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "adosfs",
-		       SYSCTL_DESCR("AmigaDOS file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 16, CTL_EOL);
-	/*
-	 * XXX the "16" above could be dynamic, thereby eliminating
-	 * one more instance of the "number to vfs" mapping problem,
-	 * but "16" is the order as taken from sys/mount.h
-	 */
-}
-
 /*
  * vfs generic function call table
  */
@@ -834,4 +818,44 @@ struct vfsops adosfs_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(adosfs_vfsops);
+
+static int
+adosfs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&adosfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&adosfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&adosfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "adosfs",
+			       SYSCTL_DESCR("AmigaDOS file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 16, CTL_EOL);
+		/*
+		 * XXX the "16" above could be dynamic, thereby eliminating
+		 * one more instance of the "number to vfs" mapping problem,
+		 * but "16" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&adosfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&adosfs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}

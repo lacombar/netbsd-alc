@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.634 2008/05/05 17:47:06 ad Exp $	*/
+/*	$NetBSD: machdep.c,v 1.637 2008/07/02 17:28:55 ad Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2000, 2004, 2006, 2008 The NetBSD Foundation, Inc.
@@ -65,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.634 2008/05/05 17:47:06 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.637 2008/07/02 17:28:55 ad Exp $");
 
 #include "opt_beep.h"
 #include "opt_compat_ibcs2.h"
@@ -266,7 +266,6 @@ vaddr_t	idt_vaddr;
 paddr_t	idt_paddr;
 vaddr_t	pentium_idt_vaddr;
 
-struct vm_map *exec_map = NULL;
 struct vm_map *mb_map = NULL;
 struct vm_map *phys_map = NULL;
 
@@ -493,13 +492,6 @@ cpu_startup()
 #endif
 
 	minaddr = 0;
-
-	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16*NCARGS, VM_MAP_PAGEABLE, false, NULL);
 
 	/*
 	 * Allocate a submap for physio
@@ -865,6 +857,7 @@ int	waittime = -1;
 void
 cpu_reboot(int howto, char *bootstr)
 {
+	int s;
 
 	if (cold) {
 		howto |= RB_HALT;
@@ -883,15 +876,18 @@ cpu_reboot(int howto, char *bootstr)
 			resettodr();
 	}
 
-	/* Disable interrupts. */
-	splhigh();
-
 	/* Do a dump if requested. */
-	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP)
+	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP) {
+		s = splhigh();
 		dumpsys();
+		splx(s);
+	}
 
 haltsys:
 	doshutdownhooks();
+
+	/* Disable interrupts. */
+	(void)splhigh();
 
 #ifdef MULTIPROCESSOR
 	x86_broadcast_ipi(X86_IPI_HALT);
@@ -1384,14 +1380,13 @@ init386(paddr_t first_avail)
 	extern u_char biostramp_image[];
 #endif
 
-
 #ifdef XEN
 	XENPRINTK(("HYPERVISOR_shared_info %p (%x)\n", HYPERVISOR_shared_info,
 	    xen_start_info.shared_info));
 	KASSERT(HYPERVISOR_shared_info != NULL);
 	cpu_info_primary.ci_vcpu = &HYPERVISOR_shared_info->vcpu_info[0];
 #endif
-	cpu_probe_features(&cpu_info_primary);
+	cpu_probe(&cpu_info_primary);
 	cpu_feature = cpu_info_primary.ci_feature_flags;
 	cpu_feature2 = cpu_info_primary.ci_feature2_flags;
 	cpu_feature_padlock = cpu_info_primary.ci_padlock_flags;

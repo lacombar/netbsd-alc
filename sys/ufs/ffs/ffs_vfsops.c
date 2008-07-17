@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_vfsops.c,v 1.226 2008/05/06 18:43:45 ad Exp $	*/
+/*	$NetBSD: ffs_vfsops.c,v 1.230 2008/06/28 01:34:05 rumble Exp $	*/
 
 /*
  * Copyright (c) 1989, 1991, 1993, 1994
@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ffs_vfsops.c,v 1.226 2008/05/06 18:43:45 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ffs_vfsops.c,v 1.230 2008/06/28 01:34:05 rumble Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_ffs.h"
@@ -62,6 +62,7 @@ __KERNEL_RCSID(0, "$NetBSD: ffs_vfsops.c,v 1.226 2008/05/06 18:43:45 ad Exp $");
 #include <sys/conf.h>
 #include <sys/kauth.h>
 #include <sys/fstrans.h>
+#include <sys/module.h>
 
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/specfs/specdev.h>
@@ -75,6 +76,10 @@ __KERNEL_RCSID(0, "$NetBSD: ffs_vfsops.c,v 1.226 2008/05/06 18:43:45 ad Exp $");
 
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
+
+MODULE(MODULE_CLASS_VFS, ffs, NULL);
+
+static struct sysctllog *ffs_sysctl_log;
 
 /* how many times ffs_init() was called */
 int ffs_initcount = 0;
@@ -119,7 +124,6 @@ struct vfsops ffs_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(ffs_vfsops);
 
 static const struct genfs_ops ffs_genfsops = {
 	.gop_size = ffs_gop_size,
@@ -136,6 +140,81 @@ static const struct ufs_ops ffs_ufsops = {
 	.uo_vfree = ffs_vfree,
 	.uo_balloc = ffs_balloc,
 };
+
+static int
+ffs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+#if 0
+	extern int doasyncfree;
+#endif
+	extern int ffs_log_changeopt;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&ffs_vfsops);
+		if (error != 0)
+			break;
+
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "ffs",
+			       SYSCTL_DESCR("Berkeley Fast File System"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 1, CTL_EOL);
+
+		/*
+		 * @@@ should we even bother with these first three?
+		 */
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+			       CTLTYPE_INT, "doclusterread", NULL,
+			       sysctl_notavail, 0, NULL, 0,
+			       CTL_VFS, 1, FFS_CLUSTERREAD, CTL_EOL);
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+			       CTLTYPE_INT, "doclusterwrite", NULL,
+			       sysctl_notavail, 0, NULL, 0,
+			       CTL_VFS, 1, FFS_CLUSTERWRITE, CTL_EOL);
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+			       CTLTYPE_INT, "doreallocblks", NULL,
+			       sysctl_notavail, 0, NULL, 0,
+			       CTL_VFS, 1, FFS_REALLOCBLKS, CTL_EOL);
+#if 0
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+			       CTLTYPE_INT, "doasyncfree",
+			       SYSCTL_DESCR("Release dirty blocks asynchronously"),
+			       NULL, 0, &doasyncfree, 0,
+			       CTL_VFS, 1, FFS_ASYNCFREE, CTL_EOL);
+#endif
+		sysctl_createv(&ffs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+			       CTLTYPE_INT, "log_changeopt",
+			       SYSCTL_DESCR("Log changes in optimization strategy"),
+			       NULL, 0, &ffs_log_changeopt, 0,
+			       CTL_VFS, 1, FFS_LOG_CHANGEOPT, CTL_EOL);
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&ffs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&ffs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}
 
 pool_cache_t ffs_inode_cache;
 pool_cache_t ffs_dinode1_cache;
@@ -521,7 +600,7 @@ ffs_reload(struct mount *mp, kauth_cred_t cred, struct lwp *l)
 		size = dpart.disklab->d_secsize;
 	/* XXX we don't handle possibility that superblock moved. */
 	error = bread(devvp, fs->fs_sblockloc / size, fs->fs_sbsize,
-		      NOCRED, &bp);
+		      NOCRED, 0, &bp);
 	if (error) {
 		brelse(bp, 0);
 		return (error);
@@ -574,7 +653,7 @@ ffs_reload(struct mount *mp, kauth_cred_t cred, struct lwp *l)
 		 * is found, then treat it like an Apple UFS filesystem anyway
 		 */
 		error = bread(devvp, (daddr_t)(APPLEUFS_LABEL_OFFSET / size),
-			APPLEUFS_LABEL_SIZE, cred, &bp);
+			APPLEUFS_LABEL_SIZE, cred, 0, &bp);
 		if (error) {
 			brelse(bp, 0);
 			return (error);
@@ -624,7 +703,7 @@ ffs_reload(struct mount *mp, kauth_cred_t cred, struct lwp *l)
 		if (i + fs->fs_frag > blks)
 			size = (blks - i) * fs->fs_fsize;
 		error = bread(devvp, fsbtodb(fs, fs->fs_csaddr + i), size,
-			      NOCRED, &bp);
+			      NOCRED, 0, &bp);
 		if (error) {
 			brelse(bp, 0);
 			return (error);
@@ -689,7 +768,7 @@ ffs_reload(struct mount *mp, kauth_cred_t cred, struct lwp *l)
 		 */
 		ip = VTOI(vp);
 		error = bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
-			      (int)fs->fs_bsize, NOCRED, &bp);
+			      (int)fs->fs_bsize, NOCRED, 0, &bp);
 		if (error) {
 			brelse(bp, 0);
 			vput(vp);
@@ -774,7 +853,7 @@ ffs_mountfs(struct vnode *devvp, struct mount *mp, struct lwp *l)
 			goto out;
 		}
 		error = bread(devvp, sblock_try[i] / size, SBLOCKSIZE, cred,
-			      &bp);
+			      0, &bp);
 		if (error) {
 			fs = NULL;
 			goto out;
@@ -883,7 +962,7 @@ ffs_mountfs(struct vnode *devvp, struct mount *mp, struct lwp *l)
 		 * is found, then treat it like an Apple UFS filesystem anyway
 		 */
 		error = bread(devvp, (daddr_t)(APPLEUFS_LABEL_OFFSET / size),
-			APPLEUFS_LABEL_SIZE, cred, &bp);
+			APPLEUFS_LABEL_SIZE, cred, 0, &bp);
 		if (error)
 			goto out;
 		error = ffs_appleufs_validate(fs->fs_fsmnt,
@@ -908,7 +987,7 @@ ffs_mountfs(struct vnode *devvp, struct mount *mp, struct lwp *l)
 
 	if (!ronly) {
 		error = bread(devvp, fsbtodb(fs, fs->fs_size - 1), fs->fs_fsize,
-		    cred, &bp);
+		    cred, 0, &bp);
 		if (bp->b_bcount != fs->fs_fsize)
 			error = EINVAL;
 		if (error) {
@@ -936,7 +1015,7 @@ ffs_mountfs(struct vnode *devvp, struct mount *mp, struct lwp *l)
 		if (i + fs->fs_frag > blks)
 			size = (blks - i) * fs->fs_fsize;
 		error = bread(devvp, fsbtodb(fs, fs->fs_csaddr + i), size,
-			      cred, &bp);
+			      cred, 0, &bp);
 		if (error) {
 			free(fs->fs_csp, M_UFSMNT);
 			goto out;
@@ -1526,7 +1605,7 @@ ffs_vget(struct mount *mp, ino_t ino, struct vnode **vpp)
 
 	/* Read in the disk contents for the inode, copy into the inode. */
 	error = bread(ump->um_devvp, fsbtodb(fs, ino_to_fsba(fs, ino)),
-		      (int)fs->fs_bsize, NOCRED, &bp);
+		      (int)fs->fs_bsize, NOCRED, 0, &bp);
 	if (error) {
 
 		/*
@@ -1669,59 +1748,6 @@ ffs_done(void)
 	pool_cache_destroy(ffs_inode_cache);
 }
 
-SYSCTL_SETUP(sysctl_vfs_ffs_setup, "sysctl vfs.ffs subtree setup")
-{
-#if 0
-	extern int doasyncfree;
-#endif
-	extern int ffs_log_changeopt;
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "ffs",
-		       SYSCTL_DESCR("Berkeley Fast File System"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 1, CTL_EOL);
-
-	/*
-	 * @@@ should we even bother with these first three?
-	 */
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-		       CTLTYPE_INT, "doclusterread", NULL,
-		       sysctl_notavail, 0, NULL, 0,
-		       CTL_VFS, 1, FFS_CLUSTERREAD, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-		       CTLTYPE_INT, "doclusterwrite", NULL,
-		       sysctl_notavail, 0, NULL, 0,
-		       CTL_VFS, 1, FFS_CLUSTERWRITE, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-		       CTLTYPE_INT, "doreallocblks", NULL,
-		       sysctl_notavail, 0, NULL, 0,
-		       CTL_VFS, 1, FFS_REALLOCBLKS, CTL_EOL);
-#if 0
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-		       CTLTYPE_INT, "doasyncfree",
-		       SYSCTL_DESCR("Release dirty blocks asynchronously"),
-		       NULL, 0, &doasyncfree, 0,
-		       CTL_VFS, 1, FFS_ASYNCFREE, CTL_EOL);
-#endif
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
-		       CTLTYPE_INT, "log_changeopt",
-		       SYSCTL_DESCR("Log changes in optimization strategy"),
-		       NULL, 0, &ffs_log_changeopt, 0,
-		       CTL_VFS, 1, FFS_LOG_CHANGEOPT, CTL_EOL);
-}
-
 /*
  * Write a superblock and associated information back to disk.
  */
@@ -1733,9 +1759,11 @@ ffs_sbupdate(struct ufsmount *mp, int waitfor)
 	int error = 0;
 	u_int32_t saveflag;
 
-	bp = getblk(mp->um_devvp,
-	    fs->fs_sblockloc >> (fs->fs_fshift - fs->fs_fsbtodb),
-	    (int)fs->fs_sbsize, 0, 0);
+	error = ffs_getblk(mp->um_devvp,
+	    fs->fs_sblockloc >> (fs->fs_fshift - fs->fs_fsbtodb), FFS_NOBLK,
+	    fs->fs_sbsize, false, &bp);
+	if (error)
+		return error;
 	saveflag = fs->fs_flags & FS_INTERNAL;
 	fs->fs_flags &= ~FS_INTERNAL;
 
@@ -1771,8 +1799,10 @@ ffs_cgupdate(struct ufsmount *mp, int waitfor)
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
 			size = (blks - i) * fs->fs_fsize;
-		bp = getblk(mp->um_devvp, fsbtodb(fs, fs->fs_csaddr + i),
-		    size, 0, 0);
+		error = ffs_getblk(mp->um_devvp, fsbtodb(fs, fs->fs_csaddr + i),
+		    FFS_NOBLK, size, false, &bp);
+		if (error)
+			break;
 #ifdef FFS_EI
 		if (mp->um_flags & UFS_NEEDSWAP)
 			ffs_csum_swap((struct csum*)space,

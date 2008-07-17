@@ -1,4 +1,4 @@
-/*	$NetBSD: portal_vfsops.c,v 1.72 2008/04/29 18:18:09 ad Exp $	*/
+/*	$NetBSD: portal_vfsops.c,v 1.76 2008/06/28 01:34:06 rumble Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: portal_vfsops.c,v 1.72 2008/04/29 18:18:09 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: portal_vfsops.c,v 1.76 2008/06/28 01:34:06 rumble Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_compat_netbsd.h"
@@ -65,12 +65,17 @@ __KERNEL_RCSID(0, "$NetBSD: portal_vfsops.c,v 1.72 2008/04/29 18:18:09 ad Exp $"
 #include <sys/dirent.h>
 #include <sys/un.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 
 #include <miscfs/genfs/genfs.h>
 
 #include <miscfs/portal/portal.h>
 
+MODULE(MODULE_CLASS_VFS, portal, NULL);
+
 VFS_PROTOS(portal);
+
+static struct sysctllog *portal_sysctl_log;
 
 void
 portal_init()
@@ -121,8 +126,12 @@ portal_mount(
 		return (EOPNOTSUPP);
 
 	/* getsock() will use the descriptor for us */
-	if ((error = getsock(args->pa_socket, &fp)) != 0)
-		return (error);
+	if ((fp = fd_getfile(args->pa_socket)) == NULL)
+		return (EBADF);
+	if (fp->f_type != DTYPE_SOCKET) {
+		fd_putfile(args->pa_socket);
+		return (ENOTSOCK);
+	}
 	so = (struct socket *) fp->f_data;
 	if (so->so_proto->pr_domain->dom_family != AF_LOCAL) {
 		fd_putfile(args->pa_socket);
@@ -200,7 +209,7 @@ portal_unmount(struct mount *mp, int mntflags)
 	 * Finally, throw away the portalmount structure
 	 */
 	free(mp->mnt_data, M_UFSMNT);	/* XXX */
-	mp->mnt_data = 0;
+	mp->mnt_data = NULL;
 	return (0);
 }
 
@@ -257,27 +266,6 @@ portal_vget(struct mount *mp, ino_t ino,
 	return (EOPNOTSUPP);
 }
 
-SYSCTL_SETUP(sysctl_vfs_portal_setup, "sysctl vfs.portal subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "portal",
-		       SYSCTL_DESCR("Portal daemon file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 8, CTL_EOL);
-	/*
-	 * XXX the "8" above could be dynamic, thereby eliminating one
-	 * more instance of the "number to vfs" mapping problem, but
-	 * "8" is the order as taken from sys/mount.h
-	 */
-}
-
 extern const struct vnodeopv_desc portal_vnodeop_opv_desc;
 
 const struct vnodeopv_desc * const portal_vnodeopv_descs[] = {
@@ -312,4 +300,44 @@ struct vfsops portal_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(portal_vfsops);
+
+static int
+portal_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&portal_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&portal_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&portal_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "portal",
+			       SYSCTL_DESCR("Portal daemon file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 8, CTL_EOL);
+		/*
+		 * XXX the "8" above could be dynamic, thereby eliminating one
+		 * more instance of the "number to vfs" mapping problem, but
+		 * "8" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&portal_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&portal_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}

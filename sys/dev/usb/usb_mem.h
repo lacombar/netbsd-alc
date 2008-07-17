@@ -1,4 +1,4 @@
-/*	$NetBSD: usb_mem.h,v 1.25 2008/04/28 20:24:00 martin Exp $	*/
+/*	$NetBSD: usb_mem.h,v 1.27 2008/06/28 17:42:53 bouyer Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_mem.h,v 1.9 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
@@ -52,6 +52,7 @@ typedef struct usb_dma_block {
 
 usbd_status	usb_allocmem(usbd_bus_handle,size_t,size_t, usb_dma_t *);
 void		usb_freemem(usbd_bus_handle, usb_dma_t *);
+void		usb_syncmem(usb_dma_t *, bus_addr_t, bus_size_t, int ops);
 
 #ifdef __NetBSD__
 struct extent;
@@ -63,7 +64,7 @@ struct usb_dma_reserve {
 	bus_addr_t paddr;
 	size_t size;
 	struct extent *extent;
-	void *softc;
+	device_t dv;
 };
 
 #if defined(_KERNEL_OPT)
@@ -76,7 +77,7 @@ struct usb_dma_reserve {
 
 usbd_status usb_reserve_allocm(struct usb_dma_reserve *, usb_dma_t *,
 				u_int32_t);
-int usb_setup_reserve(void *, struct usb_dma_reserve *, bus_dma_tag_t, size_t);
+int usb_setup_reserve(device_t, struct usb_dma_reserve *, bus_dma_tag_t, size_t);
 void usb_reserve_freem(struct usb_dma_reserve *, usb_dma_t *);
 
 #endif

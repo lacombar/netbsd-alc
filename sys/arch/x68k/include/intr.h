@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.h,v 1.18 2008/04/28 20:23:40 martin Exp $	*/
+/*	$NetBSD: intr.h,v 1.20 2008/06/23 01:49:31 isaki Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@ void	spl0(void);
 #define splsoftclock()	splraise1()
 #define splsoftnet()	splraise1()
 #define splsoftserial()	splraise1()
-#define splvm()         splraise4()
+#define splvm()         splraise5()
 #define splsched()      spl7()
 #define splhigh()       spl7()
 
@@ -57,16 +57,23 @@ void	spl0(void);
 #define	IPL_SOFTNET	3
 #define	IPL_SOFTSERIAL	4
 #define	IPL_VM		5
-#define	IPL_SCHED	5
-#define	IPL_HIGH	6
-#define	NIPL		7
+#define	IPL_SCHED	6
+#define	IPL_HIGH	7
+#define	NIPL		8
+
+extern const uint16_t ipl2psl_table[NIPL];
 
 typedef int ipl_t;
 typedef struct {
 	uint16_t _psl;
 } ipl_cookie_t;
 
-ipl_cookie_t makeiplcookie(ipl_t);
+static inline ipl_cookie_t
+makeiplcookie(ipl_t ipl)
+{
+
+	return (ipl_cookie_t){._psl = ipl2psl_table[ipl]};
+}
 
 static inline int
 splraiseipl(ipl_cookie_t icookie)

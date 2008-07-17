@@ -1,4 +1,4 @@
-/*	$NetBSD: smbfs_vfsops.c,v 1.80 2008/05/05 17:11:17 ad Exp $	*/
+/*	$NetBSD: smbfs_vfsops.c,v 1.84 2008/06/29 18:45:20 rumble Exp $	*/
 
 /*
  * Copyright (c) 2000-2001, Boris Popov
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: smbfs_vfsops.c,v 1.80 2008/05/05 17:11:17 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: smbfs_vfsops.c,v 1.84 2008/06/29 18:45:20 rumble Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_quota.h"
@@ -53,6 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: smbfs_vfsops.c,v 1.80 2008/05/05 17:11:17 ad Exp $")
 #include <sys/stat.h>
 #include <sys/malloc.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 #include <miscfs/genfs/genfs.h>
 
 
@@ -65,37 +66,11 @@ __KERNEL_RCSID(0, "$NetBSD: smbfs_vfsops.c,v 1.80 2008/05/05 17:11:17 ad Exp $")
 #include <fs/smbfs/smbfs_node.h>
 #include <fs/smbfs/smbfs_subr.h>
 
-#ifndef __NetBSD__
-SYSCTL_NODE(_vfs, OID_AUTO, smbfs, CTLFLAG_RW, 0, "SMB/CIFS file system");
-SYSCTL_INT(_vfs_smbfs, OID_AUTO, version, CTLFLAG_RD, &smbfs_version, 0, "");
-#else
-SYSCTL_SETUP(sysctl_vfs_samba_setup, "sysctl vfs.samba subtree setup")
-{
-	const struct sysctlnode *smb = NULL;
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, &smb,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "samba",
-		       SYSCTL_DESCR("SMB/CIFS remote file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_CREATE, CTL_EOL);
-
-	if (smb != NULL)
-		sysctl_createv(clog, 0, &smb, NULL,
-			       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
-			       CTLTYPE_INT, "version",
-			       SYSCTL_DESCR("smbfs version"),
-			       NULL, SMBFS_VERSION, NULL, 0,
-			       CTL_CREATE, CTL_EOL);
-}
-#endif
+MODULE(MODULE_CLASS_VFS, smbfs, NULL);
 
 VFS_PROTOS(smbfs);
+
+static struct sysctllog *smbfs_sysctl_log;
 
 static int smbfs_setroot(struct mount *);
 
@@ -134,7 +109,52 @@ struct vfsops smbfs_vfsops = {
 	0,			/* vfs_refcount */
 	{ NULL, NULL },
 };
-VFS_ATTACH(smbfs_vfsops);
+
+static int
+smbfs_modcmd(modcmd_t cmd, void *arg)
+{
+	const struct sysctlnode *smb = NULL;
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&smbfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&smbfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&smbfs_sysctl_log, 0, NULL, &smb,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "samba",
+			       SYSCTL_DESCR("SMB/CIFS remote file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_CREATE, CTL_EOL);
+
+		if (smb != NULL) {
+			sysctl_createv(&smbfs_sysctl_log, 0, &smb, NULL,
+				       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
+				       CTLTYPE_INT, "version",
+				       SYSCTL_DESCR("smbfs version"),
+				       NULL, SMBFS_VERSION, NULL, 0,
+				       CTL_CREATE, CTL_EOL);
+		}
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&smbfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&smbfs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}
 
 int
 smbfs_mount(struct mount *mp, const char *path, void *data, size_t *data_len)
@@ -336,14 +356,14 @@ smbfs_init(void)
 	pool_init(&smbfs_node_pool, sizeof(struct smbnode), 0, 0, 0,
 	    "smbfsnopl", &pool_allocator_nointr, IPL_NONE);
 
-	SMBVDEBUG("init.\n");
+	SMBVDEBUG0("init.\n");
 }
 
 void
 smbfs_reinit(void)
 {
 
-	SMBVDEBUG("reinit.\n");
+	SMBVDEBUG0("reinit.\n");
 }
 
 void
@@ -351,12 +371,10 @@ smbfs_done(void)
 {
 
 	pool_destroy(&smbfs_node_pool);
-
-	pool_destroy(&smbfs_node_pool);
 	malloc_type_detach(M_SMBNODENAME);
 	malloc_type_detach(M_SMBFSDATA);
 
-	SMBVDEBUG("done.\n");
+	SMBVDEBUG0("done.\n");
 }
 
 /*

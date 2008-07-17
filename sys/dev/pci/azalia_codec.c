@@ -1,4 +1,4 @@
-/*	$NetBSD: azalia_codec.c,v 1.64 2008/04/28 20:23:54 martin Exp $	*/
+/*	$NetBSD: azalia_codec.c,v 1.67 2008/07/06 00:14:00 abs Exp $	*/
 
 /*-
  * Copyright (c) 2005 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: azalia_codec.c,v 1.64 2008/04/28 20:23:54 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: azalia_codec.c,v 1.67 2008/07/06 00:14:00 abs Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -39,7 +39,7 @@ __KERNEL_RCSID(0, "$NetBSD: azalia_codec.c,v 1.64 2008/04/28 20:23:54 martin Exp
 #include <sys/systm.h>
 #include <dev/pci/azalia.h>
 
-#define XNAME(co)	device_xname(((device_t)co->az))
+#define XNAME(co)	device_xname((co)->dev)
 #ifdef MAX_VOLUME_255
 # define MIXER_DELTA(n)	(AUDIO_MAX_GAIN / (n))
 #else
@@ -3128,6 +3128,12 @@ ad1981hd_mixer_init(codec_t *this)
 		mc.type = AUDIO_MIXER_ENUM;
 		mc.un.ord = 1;
 		generic_mixer_set(this, 0x09, MI_TARGET_PINDIR, &mc);
+		generic_mixer_set(this, 0x05, MI_TARGET_EAPD, &mc);
+		mc.type = AUDIO_MIXER_VALUE;
+		mc.un.value.num_channels = 2;
+		mc.un.value.level[0] = AUDIO_MAX_GAIN;
+		mc.un.value.level[1] = AUDIO_MAX_GAIN;
+		generic_mixer_set(this, 0x1a, MI_TARGET_VOLUME, &mc);
 	}
 	return 0;
 }
@@ -4079,7 +4085,9 @@ atihdmi_init_dacgroup(codec_t *this)
 	static const convgroupset_t dacs = {
 		-1, 1,
 		{{1, {0x02}}}};	/* digital */
-	static const convgroupset_t adcs = {-1, 0, {}}; /* no recording */
+	static const convgroupset_t adcs = {
+		-1, 0,
+		{{0, {0x00}}}}; /* no recording */
 
 	this->dacs = dacs;
 	this->adcs = adcs;

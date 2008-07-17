@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.36 2008/05/08 07:09:18 dyoung Exp $
+#	$NetBSD: Makefile,v 1.38 2008/07/02 07:44:13 dyoung Exp $
 #	@(#)Makefile	8.1 (Berkeley) 6/5/93
 
 # when making a change to this file, please check if the change is
@@ -6,39 +6,16 @@
 
 .include <bsd.own.mk>
 
-PROG=	ifconfig
 MAN=	ifconfig.8
 
-WARNS=	4
-
-CPPFLAGS+=	-I${NETBSDSRCDIR}/sys/
-
+WARNS=4
+CFLAGS+=-g
+SRCS= af_atalk.c af_iso.c af_link.c carp.c
 .if (${USE_INET6} != "no")
-CPPFLAGS+=-DINET6
-.endif
-
-DPADD+=${LIBUTIL}
-DPADD+=${LIBPROP}
-LDADD+=-lutil
-LDADD+=-lprop
-
-SRCS= ifconfig.c 
-
-SRCS+= af_atalk.c
-SRCS+= af_inet.c
-SRCS+= af_inetany.c
-.if (${USE_INET6} != "no")
+CPPFLAGS+=	-DINET6
 SRCS+= af_inet6.c
 .endif
-SRCS+= af_iso.c
-SRCS+= carp.c
 
-SRCS+= agr.c
-SRCS+= ieee80211.c
-SRCS+= tunnel.c
-SRCS+= vlan.c
-SRCS+= parse.c
-SRCS+= env.c
-SRCS+= util.c
+.include "Makefile.inc"
 
 .include <bsd.prog.mk>

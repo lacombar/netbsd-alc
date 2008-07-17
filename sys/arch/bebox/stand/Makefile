@@ -1,5 +1,5 @@
-#	$NetBSD: Makefile,v 1.2 1999/06/28 01:08:05 sakamoto Exp $
+#	$NetBSD: Makefile,v 1.4 2008/05/26 16:28:39 kiyohara Exp $
 
-SUBDIR=	boot elf2pef mkbootimage
+SUBDIR= common .WAIT boot_com0 boot_vga boot
 
 .include <bsd.subdir.mk>

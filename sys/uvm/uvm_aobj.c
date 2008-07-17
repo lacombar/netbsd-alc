@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_aobj.c,v 1.100 2008/05/05 17:11:17 ad Exp $	*/
+/*	$NetBSD: uvm_aobj.c,v 1.103 2008/06/25 13:21:04 ad Exp $	*/
 
 /*
  * Copyright (c) 1998 Chuck Silvers, Charles D. Cranor and
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_aobj.c,v 1.100 2008/05/05 17:11:17 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_aobj.c,v 1.103 2008/06/25 13:21:04 ad Exp $");
 
 #include "opt_uvmhist.h"
 
@@ -144,6 +144,8 @@ LIST_HEAD(uao_swhash, uao_swhash_elt);
 POOL_INIT(uao_swhash_elt_pool, sizeof(struct uao_swhash_elt), 0, 0, 0,
     "uaoeltpl", NULL, IPL_VM);
 
+static struct pool_cache uvm_aobj_cache;
+
 /*
  * uvm_aobj: the actual anon-backed uvm_object
  *
@@ -169,9 +171,6 @@ struct uvm_aobj {
 /*
  * uvm_aobj_pool: pool of uvm_aobj structures
  */
-POOL_INIT(uvm_aobj_pool, sizeof(struct uvm_aobj), 0, 0, 0, "aobjpl",
-    &pool_allocator_nointr, IPL_NONE);
-
 MALLOC_DEFINE(M_UVMAOBJ, "UVM aobj", "UVM aobj and related structures");
 
 /*
@@ -449,7 +448,7 @@ uao_free(struct uvm_aobj *aobj)
 	 */
 
 	UVM_OBJ_DESTROY(&aobj->u_obj);
-	pool_put(&uvm_aobj_pool, aobj);
+	pool_cache_put(&uvm_aobj_cache, aobj);
 
 	/*
 	 * adjust the counter of pages only in swap for all
@@ -503,7 +502,7 @@ uao_create(vsize_t size, int flags)
 		kobj_alloced = UAO_FLAG_KERNSWAP;
 		refs = 0xdeadbeaf; /* XXX: gcc */
 	} else {
-		aobj = pool_get(&uvm_aobj_pool, PR_WAITOK);
+		aobj = pool_cache_get(&uvm_aobj_cache, PR_WAITOK);
 		aobj->u_pages = pages;
 		aobj->u_flags = 0;
 		refs = 1;
@@ -576,6 +575,8 @@ uao_init(void)
 	uao_initialized = true;
 	LIST_INIT(&uao_list);
 	mutex_init(&uao_list_lock, MUTEX_DEFAULT, IPL_NONE);
+	pool_cache_bootstrap(&uvm_aobj_cache, sizeof(struct uvm_aobj), 0, 0,
+	    0, "aobj", NULL, IPL_NONE, NULL, NULL, NULL);
 }
 
 /*
@@ -588,6 +589,14 @@ uao_init(void)
 void
 uao_reference(struct uvm_object *uobj)
 {
+
+	/*
+ 	 * kernel_object already has plenty of references, leave it alone.
+ 	 */
+
+	if (UVM_OBJ_IS_KERN_OBJECT(uobj))
+		return;
+
 	mutex_enter(&uobj->vmobjlock);
 	uao_reference_locked(uobj);
 	mutex_exit(&uobj->vmobjlock);
@@ -629,6 +638,14 @@ uao_reference_locked(struct uvm_object *uobj)
 void
 uao_detach(struct uvm_object *uobj)
 {
+
+	/*
+ 	 * detaching from kernel_object is a noop.
+ 	 */
+
+	if (UVM_OBJ_IS_KERN_OBJECT(uobj))
+		return;
+
 	mutex_enter(&uobj->vmobjlock);
 	uao_detach_locked(uobj);
 }
@@ -808,7 +825,7 @@ uao_put(struct uvm_object *uobj, voff_t start, voff_t stop, int flags)
 	 */
 
 	if (by_list) {
-		TAILQ_INSERT_TAIL(&uobj->memq, &endmp, listq);
+		TAILQ_INSERT_TAIL(&uobj->memq, &endmp, listq.queue);
 		nextpg = TAILQ_FIRST(&uobj->memq);
 		uvm_lwp_hold(curlwp);
 	} else {
@@ -822,7 +839,7 @@ uao_put(struct uvm_object *uobj, voff_t start, voff_t stop, int flags)
 			pg = nextpg;
 			if (pg == &endmp)
 				break;
-			nextpg = TAILQ_NEXT(pg, listq);
+			nextpg = TAILQ_NEXT(pg, listq.queue);
 			if (pg->offset < start || pg->offset >= stop)
 				continue;
 		} else {
@@ -841,16 +858,16 @@ uao_put(struct uvm_object *uobj, voff_t start, voff_t stop, int flags)
 
 		if (pg->flags & PG_BUSY) {
 			if (by_list) {
-				TAILQ_INSERT_BEFORE(pg, &curmp, listq);
+				TAILQ_INSERT_BEFORE(pg, &curmp, listq.queue);
 			}
 			pg->flags |= PG_WANTED;
 			UVM_UNLOCK_AND_WAIT(pg, &uobj->vmobjlock, 0,
 			    "uao_put", 0);
 			mutex_enter(&uobj->vmobjlock);
 			if (by_list) {
-				nextpg = TAILQ_NEXT(&curmp, listq);
+				nextpg = TAILQ_NEXT(&curmp, listq.queue);
 				TAILQ_REMOVE(&uobj->memq, &curmp,
-				    listq);
+				    listq.queue);
 			} else
 				curoff -= PAGE_SIZE;
 			continue;
@@ -909,7 +926,7 @@ uao_put(struct uvm_object *uobj, voff_t start, voff_t stop, int flags)
 		}
 	}
 	if (by_list) {
-		TAILQ_REMOVE(&uobj->memq, &endmp, listq);
+		TAILQ_REMOVE(&uobj->memq, &endmp, listq.queue);
 		uvm_lwp_rele(curlwp);
 	}
 	mutex_exit(&uobj->vmobjlock);

@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_syscalls.c,v 1.131 2008/04/28 20:24:05 martin Exp $	*/
+/*	$NetBSD: uipc_syscalls.c,v 1.133 2008/06/24 11:21:46 ad Exp $	*/
 
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
@@ -58,7 +58,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uipc_syscalls.c,v 1.131 2008/04/28 20:24:05 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uipc_syscalls.c,v 1.133 2008/06/24 11:21:46 ad Exp $");
 
 #include "opt_pipe.h"
 
@@ -170,10 +170,14 @@ do_sys_accept(struct lwp *l, int sock, struct mbuf **name, register_t *new_sock)
 
 	if ((fp = fd_getfile(sock)) == NULL)
 		return (EBADF);
-	if (fp->f_type != DTYPE_SOCKET)
+	if (fp->f_type != DTYPE_SOCKET) {
+		fd_putfile(sock);
 		return (ENOTSOCK);
-	if ((error = fd_allocfile(&fp2, &fd)) != 0)
+	}
+	if ((error = fd_allocfile(&fp2, &fd)) != 0) {
+		fd_putfile(sock);
 		return (error);
+	}
 	nam = m_get(M_WAIT, MT_SONAME);
 	*new_sock = fd;
 	so = fp->f_data;
@@ -1191,21 +1195,5 @@ sockargs(struct mbuf **mp, const void *bf, size_t buflen, int type)
 #endif
 		sa->sa_len = buflen;
 	}
-	return (0);
-}
-
-int
-getsock(int fdes, struct file **fpp)
-{
-	file_t		*fp;
-
-	if ((fp = fd_getfile(fdes)) == NULL)
-		return (EBADF);
-
-	if (fp->f_type != DTYPE_SOCKET) {
-		fd_putfile(fdes);
-		return (ENOTSOCK);
-	}
-	*fpp = fp;
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: init_sysctl.c,v 1.137 2008/04/30 17:18:53 ad Exp $ */
+/*	$NetBSD: init_sysctl.c,v 1.144 2008/07/15 22:25:30 christos Exp $ */
 
 /*-
  * Copyright (c) 2003, 2007, 2008 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.137 2008/04/30 17:18:53 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.144 2008/07/15 22:25:30 christos Exp $");
 
 #include "opt_sysv.h"
 #include "opt_posix.h"
@@ -67,6 +67,8 @@ __KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.137 2008/04/30 17:18:53 ad Exp $")
 #include <sys/kauth.h>
 #include <sys/ktrace.h>
 
+#include <miscfs/specfs/specdev.h>
+
 #ifdef COMPAT_NETBSD32
 #include <compat/netbsd32/netbsd32.h>
 #endif
@@ -92,7 +94,6 @@ static const u_int sysctl_flagmap[] = {
 
 static const u_int sysctl_sflagmap[] = {
 	PS_NOCLDSTOP, P_NOCLDSTOP,
-	PS_PPWAIT, P_PPWAIT,
 	PS_WEXIT, P_WEXIT,
 	PS_STOPFORK, P_STOPFORK,
 	PS_STOPEXEC, P_STOPEXEC,
@@ -110,6 +111,7 @@ static const u_int sysctl_slflagmap[] = {
 
 static const u_int sysctl_lflagmap[] = {
 	PL_CONTROLT, P_CONTROLT,
+	PL_PPWAIT, P_PPWAIT,
 	0
 };
 
@@ -1090,7 +1092,7 @@ sysctl_kern_trigger_panic(SYSCTLFN_ARGS)
 static int
 sysctl_kern_maxvnodes(SYSCTLFN_ARGS)
 {
-	int error, new_vnodes, old_vnodes;
+	int error, new_vnodes, old_vnodes, new_max;
 	struct sysctlnode node;
 
 	new_vnodes = desiredvnodes;
@@ -1099,6 +1101,11 @@ sysctl_kern_maxvnodes(SYSCTLFN_ARGS)
 	error = sysctl_lookup(SYSCTLFN_CALL(&node));
 	if (error || newp == NULL)
 		return (error);
+
+	/* Limits: 75% of KVA and physical memory. */
+	new_max = calc_cache_size(kernel_map, 75, 75) / VNODE_COST;
+	if (new_vnodes > new_max)
+		new_vnodes = new_max;
 
 	old_vnodes = desiredvnodes;
 	desiredvnodes = new_vnodes;
@@ -1860,7 +1867,6 @@ sysctl_kern_drivers(SYSCTLFN_ARGS)
 	int i;
 	extern struct devsw_conv *devsw_conv;
 	extern int max_devsw_convs;
-	extern kmutex_t devsw_lock;
 
 	if (newp != NULL || namelen != 0)
 		return (EINVAL);
@@ -1877,7 +1883,7 @@ sysctl_kern_drivers(SYSCTLFN_ARGS)
 	 */
 	error = 0;
 	sysctl_unlock();
-	mutex_enter(&devsw_lock);
+	mutex_enter(&specfs_lock);
 	for (i = 0; i < max_devsw_convs; i++) {
 		dname = devsw_conv[i].d_name;
 		if (dname == NULL)
@@ -1890,15 +1896,15 @@ sysctl_kern_drivers(SYSCTLFN_ARGS)
 		kd.d_bmajor = devsw_conv[i].d_bmajor;
 		kd.d_cmajor = devsw_conv[i].d_cmajor;
 		strlcpy(kd.d_name, dname, sizeof kd.d_name);
-		mutex_exit(&devsw_lock);
+		mutex_exit(&specfs_lock);
 		error = dcopyout(l, &kd, where, sizeof kd);
-		mutex_enter(&devsw_lock);
+		mutex_enter(&specfs_lock);
 		if (error != 0)
 			break;
 		buflen -= sizeof kd;
 		where += sizeof kd;
 	}
-	mutex_exit(&devsw_lock);
+	mutex_exit(&specfs_lock);
 	sysctl_relock();
 	*oldlenp = where - start;
 	return error;
@@ -2733,7 +2739,7 @@ sysctl_kern_cpid(SYSCTLFN_ARGS)
 
 	for (CPU_INFO_FOREACH(cii, ci)) {
 		if (n <= 0)
-			cp_id[0] = ci->ci_cpuid;
+			cp_id[0] = cpu_index(ci);
 		/*
 		 * if a specific processor was requested and we just
 		 * did it, we're done here
@@ -2873,7 +2879,6 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki, bool zombie)
 	sigset_t ss1, ss2;
 	struct rusage ru;
 	struct vmspace *vm;
-	int tmp;
 
 	KASSERT(mutex_owned(proc_lock));
 	KASSERT(mutex_owned(p->p_lock));
@@ -2936,6 +2941,7 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki, bool zombie)
 
 	strncpy(ki->p_comm, p->p_comm,
 	    min(sizeof(ki->p_comm), sizeof(p->p_comm)));
+	strncpy(ki->p_ename, p->p_emul->e_name, sizeof(ki->p_ename));
 
 	ki->p_nlwps = p->p_nlwps;
 	ki->p_realflag = ki->p_flag;
@@ -2947,10 +2953,11 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki, bool zombie)
 		ki->p_vm_dsize = vm->vm_dsize;
 		ki->p_vm_ssize = vm->vm_ssize;
 
-		/* Pick a "representative" LWP */
-		l = proc_representative_lwp(p, &tmp, 1);
+		/* Pick the primary (first) LWP */
+		l = LIST_FIRST(&p->p_lwps);
+		KASSERT(l != NULL);
 		lwp_lock(l);
-		ki->p_nrlwps = tmp;
+		ki->p_nrlwps = p->p_nrlwps;
 		ki->p_forw = 0;
 		ki->p_back = 0;
 		ki->p_addr = PTRTOUINT64(l->l_addr);
@@ -2968,7 +2975,7 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki, bool zombie)
 		if (l->l_wchan)
 			strncpy(ki->p_wmesg, l->l_wmesg, sizeof(ki->p_wmesg));
 		ki->p_wchan = PTRTOUINT64(l->l_wchan);
-		ki->p_cpuid = l->l_cpu->ci_cpuid;
+		ki->p_cpuid = cpu_index(l->l_cpu);
 		lwp_unlock(l);
 		LIST_FOREACH(l, &p->p_lwps, l_sibling) {
 			/* This is hardly correct, but... */
@@ -3061,6 +3068,7 @@ fill_lwp(struct lwp *l, struct kinfo_lwp *kl)
 	kl->l_stat = l->l_stat;
 	kl->l_lid = l->l_lid;
 	kl->l_flag = sysctl_map_flags(sysctl_lwpprflagmap, l->l_prflag);
+	kl->l_flag |= sysctl_map_flags(sysctl_lwpflagmap, l->l_flag);
 
 	kl->l_swtime = l->l_swtime;
 	kl->l_slptime = l->l_slptime;
@@ -3074,7 +3082,7 @@ fill_lwp(struct lwp *l, struct kinfo_lwp *kl)
 	if (l->l_wchan)
 		strncpy(kl->l_wmesg, l->l_wmesg, sizeof(kl->l_wmesg));
 	kl->l_wchan = PTRTOUINT64(l->l_wchan);
-	kl->l_cpuid = l->l_cpu->ci_cpuid;
+	kl->l_cpuid = cpu_index(l->l_cpu);
 	bintime2timeval(&l->l_rtime, &tv);
 	kl->l_rtime_sec = tv.tv_sec;
 	kl->l_rtime_usec = tv.tv_usec;
@@ -3115,8 +3123,9 @@ fill_eproc(struct proc *p, struct eproc *ep, bool zombie)
 		ep->e_vm.vm_dsize = vm->vm_dsize;
 		ep->e_vm.vm_ssize = vm->vm_ssize;
 
-		/* Pick a "representative" LWP */
-		l = proc_representative_lwp(p, NULL, 1);
+		/* Pick the primary (first) LWP */
+		l = LIST_FIRST(&p->p_lwps);
+		KASSERT(l != NULL);
 		lwp_lock(l);
 		if (l->l_wchan)
 			strncpy(ep->e_wmesg, l->l_wmesg, WMESGLEN);

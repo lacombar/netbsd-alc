@@ -1,4 +1,4 @@
-	$NetBSD: syscalls.master,v 1.200 2008/04/24 11:51:19 ad Exp $
+	$NetBSD: syscalls.master,v 1.207 2008/07/16 15:42:54 pooka Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -53,6 +53,7 @@
 #include <sys/systm.h>
 #include <sys/signal.h>
 #include <sys/mount.h>
+#include <sys/sched.h>
 #include <sys/syscallargs.h>
 
 %%
@@ -121,9 +122,9 @@
 			    unsigned int *alen); }
 32	STD		{ int sys_getsockname(int fdes, struct sockaddr *asa, \
 			    unsigned int *alen); }
-33	STD 	 RUMP	{ int sys_access(const char *path, int flags); }
+33	STD 		{ int sys_access(const char *path, int flags); }
 34	STD 	 RUMP	{ int sys_chflags(const char *path, u_long flags); }
-35	STD 	 RUMP	{ int sys_fchflags(int fd, u_long flags); }
+35	STD 		{ int sys_fchflags(int fd, u_long flags); }
 36	STD 	 RUMP	{ void sys_sync(void); }
 37	STD 		{ int sys_kill(int pid, int signum); }
 38	COMPAT_43 	{ int sys_stat(const char *path, struct stat43 *ub); } \
@@ -214,7 +215,7 @@
 93	STD 		{ int sys_select(int nd, fd_set *in, fd_set *ou, \
 			    fd_set *ex, struct timeval *tv); }
 94	UNIMPL		setdopt
-95	STD 		{ int sys_fsync(int fd); }
+95	STD	RUMP 	{ int sys_fsync(int fd); }
 96	STD 		{ int sys_setpriority(int which, id_t who, int prio); }
 97	COMPAT_30	{ int sys_socket(int domain, int type, int protocol); }
 98	STD		{ int sys_connect(int s, const struct sockaddr *name, \
@@ -270,7 +271,7 @@
 			    otruncate
 130	COMPAT_43 	{ int sys_ftruncate(int fd, long length); } oftruncate
 131	STD 		{ int sys_flock(int fd, int how); }
-132	STD 		{ int sys_mkfifo(const char *path, mode_t mode); }
+132	STD 	 RUMP	{ int sys_mkfifo(const char *path, mode_t mode); }
 133	STD 		{ ssize_t sys_sendto(int s, const void *buf, \
 			    size_t len, int flags, const struct sockaddr *to, \
 			    unsigned int tolen); }
@@ -279,7 +280,7 @@
 			    int protocol, int *rsv); }
 136	STD 	 RUMP	{ int sys_mkdir(const char *path, mode_t mode); }
 137	STD 	 RUMP	{ int sys_rmdir(const char *path); }
-138	STD 		{ int sys_utimes(const char *path, \
+138	STD 	 RUMP	{ int sys_utimes(const char *path, \
 			    const struct timeval *tptr); }
 139	OBSOL		4.2 sigreturn
 140	STD 		{ int sys_adjtime(const struct timeval *delta, \
@@ -353,9 +354,9 @@
 171	EXCL		1.0 shmsys
 #endif
 172	UNIMPL
-173	STD 		{ ssize_t sys_pread(int fd, void *buf, \
+173	STD 	 RUMP	{ ssize_t sys_pread(int fd, void *buf, \
 			    size_t nbyte, int pad, off_t offset); }
-174	STD 		{ ssize_t sys_pwrite(int fd, const void *buf, \
+174	STD 	 RUMP	{ ssize_t sys_pwrite(int fd, const void *buf, \
 			    size_t nbyte, int pad, off_t offset); }
 ; For some reason, ntp_gettime doesn't want to raise SIGSYS when it's excluded.
 175	COMPAT_30 	 { int sys_ntp_gettime(struct ntptimeval30 *ntvp); }
@@ -576,7 +577,7 @@
 274	STD 	 RUMP	{ int sys_lchmod(const char *path, mode_t mode); }
 275	STD 	 RUMP	{ int sys_lchown(const char *path, uid_t uid, \
 			    gid_t gid); }
-276	STD 		{ int sys_lutimes(const char *path, \
+276	STD 	 RUMP	{ int sys_lutimes(const char *path, \
 			    const struct timeval *tptr); }
 277	STD 		{ int sys___msync13(void *addr, size_t len, int flags); }
 278	COMPAT_30 	{ int sys___stat13(const char *path, struct stat13 *ub); }
@@ -636,7 +637,7 @@
 #else
 303	EXCL		__shmctl13
 #endif
-304	STD 		{ int sys_lchflags(const char *path, u_long flags); }
+304	STD 	 RUMP	{ int sys_lchflags(const char *path, u_long flags); }
 305	STD 		{ int sys_issetugid(void); }
 306	STD 		{ int sys_utrace(const char *label, void *addr, \
 				size_t len); }
@@ -702,9 +703,9 @@
 347	STD 		{ int sys__sched_getparam(pid_t pid, lwpid_t lid, \
 			    int *policy, struct sched_param *params); }
 348	STD 		{ int sys__sched_setaffinity(pid_t pid, lwpid_t lid, \
-			    size_t size, void *cpuset); }
+			    size_t size, const cpuset_t *cpuset); }
 349	STD 		{ int sys__sched_getaffinity(pid_t pid, lwpid_t lid, \
-			    size_t size, void *cpuset); }
+			    size_t size, cpuset_t *cpuset); }
 350	STD 		{ int sys_sched_yield(void); }
 351	UNIMPL
 352	UNIMPL
@@ -786,9 +787,9 @@
 			    const char *name); }
 386	STD 		{ int sys_fremovexattr(int fd, \
 			    const char *name); }
-387	STD 		{ int sys___stat30(const char *path, struct stat *ub); }
+387	STD 	 RUMP	{ int sys___stat30(const char *path, struct stat *ub); }
 388	STD 		{ int sys___fstat30(int fd, struct stat *sb); }
-389	STD 		{ int sys___lstat30(const char *path, struct stat *ub); }
+389	STD 	 RUMP	{ int sys___lstat30(const char *path, struct stat *ub); }
 390	STD 		{ int sys___getdents30(int fd, char *buf, size_t count); }
 391	IGNORED		old posix_fadvise
 392	COMPAT_30 	{ int sys___fhstat30(const struct compat_30_fhandle \

@@ -1,4 +1,4 @@
-/*	$NetBSD: lock_stubs.S,v 1.18 2008/05/06 23:03:03 ad Exp $	*/
+/*	$NetBSD: lock_stubs.S,v 1.20 2008/06/27 18:16:02 ad Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -62,7 +62,7 @@
  */
 	.align	64
 
-NENTRY(mutex_enter)
+ENTRY(mutex_enter)
 	movq	CPUVAR(CURLWP), %rcx
 	xorq	%rax, %rax
 	LOCK(1)
@@ -81,7 +81,7 @@ NENTRY(mutex_enter)
  * on multiprocessor systems, and comments in arch/x86/include/lock.h about
  * memory ordering on Intel x86 systems.
  */
-NENTRY(mutex_exit)
+ENTRY(mutex_exit)
 	movq	CPUVAR(CURLWP), %rax
 	xorq	%rdx, %rdx
 	cmpxchgq %rdx, MTX_OWNER(%rdi)
@@ -95,21 +95,19 @@ NENTRY(mutex_exit)
  *
  * Acquire a spin mutex and post a load fence.
  */
-NENTRY(mutex_spin_enter)
-#if defined(FULL)
-	movl	$0x0100, %eax			/* new + expected value */
-#endif
+ENTRY(mutex_spin_enter)
+	movl	$1, %eax
 	movl	CPUVAR(ILEVEL), %esi
 	movzbl	MTX_IPL(%rdi), %ecx		/* new SPL */
 	cmpl	%ecx, %esi			/* higher? */
 	cmovgl	%esi, %ecx
 	movl	%ecx, CPUVAR(ILEVEL)		/* splraiseipl() */
-	subl	$1, CPUVAR(MTX_COUNT)		/* decl doesnt set CF */
+	subl	%eax, CPUVAR(MTX_COUNT)		/* decl doesnt set CF */
 	cmovncl	CPUVAR(MTX_OLDSPL), %esi
 	movl	%esi, CPUVAR(MTX_OLDSPL)
 #if defined(FULL)
-	LOCK(11)
-	cmpxchgb %ah, MTX_LOCK(%rdi)		/* lock */
+	xchgb	%al, MTX_LOCK(%rdi)		/* lock */
+	testb	%al, %al
 	jnz	1f
 #endif
 	ret
@@ -121,7 +119,7 @@ NENTRY(mutex_spin_enter)
  *
  * Release a spin mutex and post a load fence.
  */
-NENTRY(mutex_spin_exit)
+ENTRY(mutex_spin_exit)
 #ifdef DIAGNOSTIC
 
 	movl	$0x0001, %eax			/* new + expected value */
@@ -177,7 +175,7 @@ NENTRY(mutex_spin_exit)
  *
  * Acquire one hold on a RW lock.
  */
-NENTRY(rw_enter)
+ENTRY(rw_enter)
 	cmpl	$RW_READER, %esi
 	jne	2f
 
@@ -211,7 +209,7 @@ NENTRY(rw_enter)
  *
  * Release one hold on a RW lock.
  */
-NENTRY(rw_exit)
+ENTRY(rw_exit)
 	movq	RW_OWNER(%rdi), %rax
 	testb	$RW_WRITE_LOCKED, %al
 	jnz	2f
@@ -247,7 +245,7 @@ NENTRY(rw_exit)
  *
  * Try to acquire one hold on a RW lock.
  */
-NENTRY(rw_tryenter)
+ENTRY(rw_tryenter)
 	cmpl	$RW_READER, %esi
 	jne	2f
 
@@ -285,7 +283,7 @@ NENTRY(rw_tryenter)
 /*
  * Spinlocks.
  */
-NENTRY(__cpu_simple_lock_init)
+ENTRY(__cpu_simple_lock_init)
 	movb	$0, (%rdi)
 	ret
 
@@ -305,11 +303,11 @@ NENTRY(__cpu_simple_lock)
 	je	1b
 	jmp	2b
 
-NENTRY(__cpu_simple_unlock)
+ENTRY(__cpu_simple_unlock)
 	movb	$0, (%rdi)
 	ret
 
-NENTRY(__cpu_simple_lock_try)
+ENTRY(__cpu_simple_lock_try)
 	movl	$0x0100, %eax
 	LOCK(7)
 	cmpxchgb %ah, (%rdi)
@@ -325,8 +323,5 @@ LABEL(x86_lockpatch)
 	.quad	.Lpatch1, .Lpatch2, .Lpatch3, .Lpatch4
 	.quad	.Lpatch5, .Lpatch6, .Lpatch7, .Lpatch8
 	.quad	.Lpatch9
-#ifdef FULL
-	.quad	.Lpatch11
-#endif
 	.quad	0
 #endif

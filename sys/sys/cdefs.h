@@ -1,4 +1,4 @@
-/*	$NetBSD: cdefs.h,v 1.66 2007/11/26 14:52:34 joerg Exp $	*/
+/*	$NetBSD: cdefs.h,v 1.68 2008/06/27 01:24:52 gmcgarry Exp $	*/
 
 /*
  * Copyright (c) 1991, 1993
@@ -191,6 +191,12 @@
 #define	__pure
 #endif
 
+#if __GNUC_PREREQ__(3, 0)
+#define	__noinline	__attribute ((__noinline__))
+#else
+#define	__noinline	/* nothing */
+#endif
+
 #if __GNUC_PREREQ__(2, 7)
 #define	__unused	__attribute__((__unused__))
 #else
@@ -210,7 +216,7 @@
 #elif defined(__PCC__)
 #define	__packed	/* XXX ignore for now */
 #define	__aligned(x)   	/* XXX ignore for now */
-#define	__section(x)   	/* XXX ignore for now */
+#define	__section(x)   	_Pragma("section " ## x)
 #elif defined(__lint__)
 #define	__packed	/* delete */
 #define	__aligned(x)	/* delete */

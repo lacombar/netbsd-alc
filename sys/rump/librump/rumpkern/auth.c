@@ -1,4 +1,4 @@
-/*	$NetBSD: auth.c,v 1.7 2008/03/11 10:50:16 pooka Exp $	*/
+/*	$NetBSD: auth.c,v 1.9 2008/07/01 12:33:32 pooka Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -32,6 +32,7 @@
 #include <sys/errno.h>
 #include <sys/kauth.h>
 #include <sys/kmem.h>
+#include <sys/proc.h>
 
 #include "rump.h"
 #include "rumpuser.h"
@@ -86,7 +87,7 @@ kauth_authorize_system(kauth_cred_t cred, kauth_action_t op,
 	enum kauth_system_req req, void *arg1, void *arg2, void *arg3)
 {
 
-	if (op != KAUTH_SYSTEM_CHSYSFLAGS)
+	if (op != KAUTH_SYSTEM_CHSYSFLAGS && op != KAUTH_SYSTEM_MKNOD)
 		panic("%s: op %d not implemented", __func__, op);
 
 	/* always allow */

@@ -1,7 +1,7 @@
-/*	$NetBSD: machdep.c,v 1.92 2008/05/05 17:47:06 ad Exp $	*/
+/*	$NetBSD: machdep.c,v 1.97 2008/07/02 17:28:54 ad Exp $	*/
 
 /*-
- * Copyright (c) 1996, 1997, 1998, 2000, 2006, 2007
+ * Copyright (c) 1996, 1997, 1998, 2000, 2006, 2007, 2008
  *     The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -77,7 +77,6 @@
  *
  */
 
-
 /*-
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -113,7 +112,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.92 2008/05/05 17:47:06 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.97 2008/07/02 17:28:54 ad Exp $");
 
 /* #define XENDEBUG_LOW  */
 
@@ -180,6 +179,7 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.92 2008/05/05 17:47:06 ad Exp $");
 #include <machine/mtrr.h>
 #include <machine/mpbiosvar.h>
 
+#include <x86/cputypes.h>
 #include <x86/cpu_msr.h>
 #include <x86/cpuvar.h>
 
@@ -231,6 +231,8 @@ int	cpureset_delay = CPURESET_DELAY;
 int     cpureset_delay = 2000; /* default to 2s */
 #endif
 
+int	cpu_class = CPUCLASS_686;
+
 #ifdef MTRR
 struct mtrr_funcs *mtrr_funcs;
 #endif
@@ -260,7 +262,6 @@ static struct vm_map lkm_map_store;
 extern struct vm_map *lkm_map;
 vaddr_t kern_end;
 
-struct vm_map *exec_map = NULL;
 struct vm_map *mb_map = NULL;
 struct vm_map *phys_map = NULL;
 
@@ -342,13 +343,6 @@ cpu_startup(void)
 	minaddr = 0;
 
 	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16*NCARGS, VM_MAP_PAGEABLE, false, NULL);
-
-	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
@@ -360,7 +354,7 @@ cpu_startup(void)
 	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    nmbclusters * mclbytes, VM_MAP_INTRSAFE, false, NULL);
 
-	uvm_map_setup(&lkm_map_store, lkm_start, lkm_end, VM_MAP_PAGEABLE);
+	uvm_map_setup(&lkm_map_store, lkm_start, lkm_end, 0);
 	lkm_map_store.pmap = pmap_kernel();
 	lkm_map = &lkm_map_store;
 
@@ -392,16 +386,15 @@ x86_64_switch_context(struct pcb *new)
 {
 	struct cpu_info *ci;
 	ci = curcpu();
-	if (/* XXX ! ci->ci_fpused */ 1) {
-		HYPERVISOR_fpu_taskswitch(0);
-		/* XXX ci->ci_fpused = 0; */
-	}
 	HYPERVISOR_stack_switch(GSEL(GDATA_SEL, SEL_KPL), new->pcb_rsp0);
 	if (xen_start_info.flags & SIF_PRIVILEGED) {
 		struct physdev_op physop;
 		physop.cmd = PHYSDEVOP_SET_IOPL;
 		physop.u.set_iopl.iopl = new->pcb_iopl;
 		HYPERVISOR_physdev_op(&physop);
+	}
+	if (new->pcb_fpcpu != ci) {
+		HYPERVISOR_fpu_taskswitch(1);
 	}
 }
 
@@ -434,7 +427,7 @@ x86_64_proc0_tss_ldt_init(void)
 #else
 	xen_set_ldt((vaddr_t) ldtstore, LDT_SIZE >> 3);
 	/* Reset TS bit and set kernel stack for interrupt handlers */
-	HYPERVISOR_fpu_taskswitch(0);
+	HYPERVISOR_fpu_taskswitch(1);
 	HYPERVISOR_stack_switch(GSEL(GDATA_SEL, SEL_KPL), pcb->pcb_rsp0);
 #endif /* XEN */
 }
@@ -636,6 +629,7 @@ struct pcb dumppcb;
 void
 cpu_reboot(int howto, char *bootstr)
 {
+	int s;
 
 	if (cold) {
 		howto |= RB_HALT;
@@ -653,15 +647,20 @@ cpu_reboot(int howto, char *bootstr)
 		resettodr();
 	}
 
-	/* Disable interrupts. */
-	splhigh();
 
 	/* Do a dump if requested. */
-	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP)
+	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP) {
+		/* Disable interrupts. */
+		s = splhigh();
 		dumpsys();
+		splx(s);
+	}
 
 haltsys:
 	doshutdownhooks();
+
+	/* Disable interrupts. */
+	(void)splhigh();
 
         if ((howto & RB_POWERDOWN) == RB_POWERDOWN) {
 #ifndef XEN
@@ -1233,14 +1232,15 @@ init_x86_64(paddr_t first_avail)
 	struct btinfo_memmap *bim;
 	uint64_t addr, size, io_end, new_physmem;
 #endif
+	cpu_probe(&cpu_info_primary);
 #else /* XEN */
+	cpu_probe(&cpu_info_primary);
 	KASSERT(HYPERVISOR_shared_info != NULL);
 	cpu_info_primary.ci_vcpu = &HYPERVISOR_shared_info->vcpu_info[0];
 
 	__PRINTK(("init_x86_64(0x%lx)\n", first_avail));
 	first_bt_vaddr = (vaddr_t) (first_avail + KERNBASE + PAGE_SIZE * 2);
 	__PRINTK(("first_bt_vaddr 0x%lx\n", first_bt_vaddr));
-	cpu_probe_features(&cpu_info_primary);
 	cpu_feature = cpu_info_primary.ci_feature_flags;
 	/* not on Xen... */
 	cpu_feature &= ~(CPUID_PGE|CPUID_PSE|CPUID_MTRR|CPUID_FXSR|CPUID_NOX);

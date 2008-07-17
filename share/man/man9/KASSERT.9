@@ -1,10 +1,7 @@
-.\"     $NetBSD: KASSERT.9,v 1.4 2008/04/30 13:10:58 martin Exp $
+.\"     $NetBSD: KASSERT.9,v 1.7 2008/07/11 13:20:17 gdt Exp $
 .\"
 .\" Copyright (c) 2006 Igor Sobrado
 .\" All rights reserved.
-.\"
-.\" This code is derived from software contributed to The NetBSD Foundation
-.\" by Matt THomas.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -55,7 +52,7 @@ In a kernel that does not have this configuration option, the
 macro is defined to be a no-op.
 .Pp
 .Fn KDASSERT
-tests are included in only kernels that has been compiled with the
+tests are included only in kernels compiled with the
 .Dv DEBUG
 configuration option.
 .Fn KDASSERT

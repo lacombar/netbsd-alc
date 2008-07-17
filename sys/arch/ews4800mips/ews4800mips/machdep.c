@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.12 2008/04/28 20:23:18 martin Exp $	*/
+/*	$NetBSD: machdep.c,v 1.14 2008/07/02 17:28:55 ad Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2004, 2005 The NetBSD Foundation, Inc.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.12 2008/04/28 20:23:18 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.14 2008/07/02 17:28:55 ad Exp $");
 
 #include "opt_ddb.h"
 
@@ -73,7 +73,6 @@ vsize_t kseg2iobufsize;		/* to reserve PTEs for KSEG2 I/O space */
 struct cpu_info cpu_info_store;
 
 /* maps for VM objects */
-struct vm_map *exec_map;
 struct vm_map *mb_map;
 struct vm_map *phys_map;
 
@@ -153,7 +152,6 @@ mach_init(int argc, char *argv[], struct bootinfo *bi)
 		curcpu()->ci_cycles_per_hz /= 2;
 		curcpu()->ci_divisor_delay /= 2;
 	}
-	MIPS_SET_CI_RECIPROCAL(curcpu());
 
 	/* Load memory to UVM */
 	for (i = 1; i < mem_cluster_cnt; i++) {
@@ -244,12 +242,6 @@ cpu_startup(void)
 	printf("total memory = %s\n", pbuf);
 
 	minaddr = 0;
-	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    16 * NCARGS, VM_MAP_PAGEABLE, false, NULL);
 	/*
 	 * Allocate a submap for physio.
 	 */

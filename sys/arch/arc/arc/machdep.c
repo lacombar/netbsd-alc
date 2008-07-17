@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.110 2008/01/09 20:38:34 wiz Exp $	*/
+/*	$NetBSD: machdep.c,v 1.112 2008/07/02 17:28:55 ad Exp $	*/
 /*	$OpenBSD: machdep.c,v 1.36 1999/05/22 21:22:19 weingart Exp $	*/
 
 /*
@@ -78,7 +78,7 @@
 /* from: Utah Hdr: machdep.c 1.63 91/04/24 */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.110 2008/01/09 20:38:34 wiz Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.112 2008/07/02 17:28:55 ad Exp $");
 
 #include "fs_mfs.h"
 #include "opt_ddb.h"
@@ -167,7 +167,6 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.110 2008/01/09 20:38:34 wiz Exp $");
 struct cpu_info cpu_info_store;
 
 /* maps for VM objects */
-struct vm_map *exec_map = NULL;
 struct vm_map *mb_map = NULL;
 struct vm_map *phys_map = NULL;
 
@@ -402,7 +401,6 @@ mach_init(int argc, char *argv[], u_int bim, void *bip)
 		curcpu()->ci_cycles_per_hz /= 2;
 		curcpu()->ci_divisor_delay /= 2;
 	}
-	MIPS_SET_CI_RECIPROCAL(curcpu());
 	sprintf(cpu_model, "%s %s%s",
 	    platform->vendor, platform->model, platform->variant);
 
@@ -578,13 +576,6 @@ cpu_startup(void)
 	printf("total memory = %s\n", pbuf);
 
 	minaddr = 0;
-
-	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    16 * NCARGS, VM_MAP_PAGEABLE, false, NULL);
 
 	/*
 	 * Allocate a submap for physio

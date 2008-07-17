@@ -1,4 +1,4 @@
-/*	$NetBSD: ip6_mroute.c,v 1.93 2008/05/04 07:22:15 thorpej Exp $	*/
+/*	$NetBSD: ip6_mroute.c,v 1.95 2008/06/24 10:35:14 gmcgarry Exp $	*/
 /*	$KAME: ip6_mroute.c,v 1.49 2001/07/25 09:21:18 jinmei Exp $	*/
 
 /*
@@ -117,7 +117,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip6_mroute.c,v 1.93 2008/05/04 07:22:15 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip6_mroute.c,v 1.95 2008/06/24 10:35:14 gmcgarry Exp $");
 
 #include "opt_inet.h"
 #include "opt_mrouting.h"
@@ -373,7 +373,7 @@ ip6_mrouter_get(int cmd, struct socket *so, struct mbuf **m)
  * Handle ioctl commands to obtain information from the cache
  */
 int
-mrt6_ioctl(int cmd, void *data)
+mrt6_ioctl(u_long cmd, void *data)
 {
 
 	switch (cmd) {
@@ -537,8 +537,7 @@ ip6_mrouter_done(void)
 				ifr.ifr_addr.sin6_family = AF_INET6;
 				ifr.ifr_addr.sin6_addr= in6addr_any;
 				ifp = mif6table[mifi].m6_ifp;
-				(*ifp->if_ioctl)(ifp, SIOCDELMULTI,
-						 (void *)&ifr);
+				(*ifp->if_ioctl)(ifp, SIOCDELMULTI, &ifr);
 			}
 		}
 	}
@@ -685,7 +684,7 @@ add_m6if(struct mif6ctl *mifcp)
 		 */
 		ifr.ifr_addr.sin6_family = AF_INET6;
 		ifr.ifr_addr.sin6_addr = in6addr_any;
-		error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (void *)&ifr);
+		error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, &ifr);
 		splx(s);
 		if (error)
 			return error;
@@ -747,7 +746,7 @@ del_m6if(mifi_t *mifip)
 
 		ifr.ifr_addr.sin6_family = AF_INET6;
 		ifr.ifr_addr.sin6_addr = in6addr_any;
-		(*ifp->if_ioctl)(ifp, SIOCDELMULTI, (void *)&ifr);
+		(*ifp->if_ioctl)(ifp, SIOCDELMULTI, &ifr);
 	} else {
 		if (reg_mif_num != (mifi_t)-1) {
 			if_detach(&multicast_register_if6);

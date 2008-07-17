@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.509 2008/05/03 14:48:31 lukem Exp $
+#	$NetBSD: bsd.own.mk,v 1.514 2008/07/12 12:15:43 gmcgarry Exp $
 
 .if !defined(_BSD_OWN_MK_)
 _BSD_OWN_MK_=1
@@ -220,6 +220,7 @@ TOOL_GMAKE=		${TOOLDIR}/bin/${_TOOL_PREFIX}gmake
 TOOL_GROFF=		PATH=${TOOLDIR}/lib/groff:$${PATH} ${TOOLDIR}/bin/${_TOOL_PREFIX}groff
 TOOL_HEXDUMP=		${TOOLDIR}/bin/${_TOOL_PREFIX}hexdump
 TOOL_HP300MKBOOT=	${TOOLDIR}/bin/${_TOOL_PREFIX}hp300-mkboot
+TOOL_HP700MKBOOT=	${TOOLDIR}/bin/${_TOOL_PREFIX}hp700-mkboot
 TOOL_INDXBIB=		${TOOLDIR}/bin/${_TOOL_PREFIX}indxbib
 TOOL_INSTALLBOOT=	${TOOLDIR}/bin/${_TOOL_PREFIX}installboot
 TOOL_INSTALL_INFO=	${TOOLDIR}/bin/${_TOOL_PREFIX}install-info
@@ -355,7 +356,6 @@ KMODGRP?=	wheel
 KMODOWN?=	root
 KMODMODE?=	${NONBINMODE}
 
-KMODULEDIR?=	/kernel/modules
 KMODULEGRP?=	wheel
 KMODULEOWN?=	root
 KMODULEMODE?=	${NONBINMODE}
@@ -545,14 +545,15 @@ MK${var}:=	yes
 # MK* options which default to "yes".
 #
 .for var in \
+	MKATF \
 	MKBFD MKBINUTILS \
-	MKCATPAGES MKCRYPTO MKCVS \
+	MKCATPAGES MKCRYPTO MKCOMPLEX MKCVS \
 	MKDOC \
 	MKGCC MKGCCCMDS MKGDB \
 	MKHESIOD MKHTML \
 	MKIEEEFP MKINET6 MKINFO MKIPFILTER MKISCSI \
 	MKKERBEROS \
-	MKLINKLIB MKLINT \
+	MKLDAP MKLINKLIB MKLINT \
 	MKMAN \
 	MKNLS \
 	MKOBJ \
@@ -567,7 +568,9 @@ ${var}?=	yes
 #
 .for var in \
 	MKCRYPTO_IDEA MKCRYPTO_MDC2 MKCRYPTO_RC5 MKDEBUG MKDEBUGLIB \
-	MKMANZ MKMODULAR MKOBJDIRS MKPUFFS MKSOFTFLOAT \
+	MKMANZ MKMODULAR MKOBJDIRS \
+	MKPCC MKPCCCMDS \
+	MKPUFFS MKSOFTFLOAT \
 	MKUNPRIVED MKUPDATE MKX11
 ${var}?=no
 .endfor
@@ -663,7 +666,7 @@ ${var}?= no
 # USE_* options which default to "yes" unless their corresponding MK*
 # variable is set to "no".
 #
-.for var in USE_HESIOD USE_INET6 USE_KERBEROS USE_PAM USE_YP
+.for var in USE_HESIOD USE_INET6 USE_KERBEROS USE_LDAP USE_PAM USE_YP
 .if (${${var:S/USE_/MK/}} == "no")
 ${var}:= no
 .else

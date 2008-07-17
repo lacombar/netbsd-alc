@@ -1,4 +1,4 @@
-/*	$NetBSD: overlay_vfsops.c,v 1.50 2008/05/05 17:11:17 ad Exp $	*/
+/*	$NetBSD: overlay_vfsops.c,v 1.53 2008/06/28 01:34:06 rumble Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 National Aeronautics & Space Administration
@@ -74,7 +74,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: overlay_vfsops.c,v 1.50 2008/05/05 17:11:17 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: overlay_vfsops.c,v 1.53 2008/06/28 01:34:06 rumble Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,10 +85,15 @@ __KERNEL_RCSID(0, "$NetBSD: overlay_vfsops.c,v 1.50 2008/05/05 17:11:17 ad Exp $
 #include <sys/mount.h>
 #include <sys/namei.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <miscfs/overlay/overlay.h>
 #include <miscfs/genfs/layer_extern.h>
 
+MODULE(MODULE_CLASS_VFS, overlay, NULL);
+
 VFS_PROTOS(ov);
+
+static struct sysctllog *overlay_sysctl_log;
 
 #define	NOVERLAYNODECACHE	16
 
@@ -232,22 +237,8 @@ ov_unmount(struct mount *mp, int mntflags)
 	mutex_destroy(&omp->ovm_hashlock);
 	hashdone(omp->ovm_node_hashtbl, HASH_LIST, omp->ovm_node_hash);
 	free(omp, M_UFSMNT);	/* XXX */
-	mp->mnt_data = 0;
+	mp->mnt_data = NULL;
 	return 0;
-}
-
-SYSCTL_SETUP(sysctl_vfs_overlay_setup, "sysctl vfs.overlay subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT, CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT, CTLTYPE_NODE, "overlay",
-		       SYSCTL_DESCR("Overlay file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_CREATE, CTL_EOL);
 }
 
 extern const struct vnodeopv_desc overlay_vnodeop_opv_desc;
@@ -284,4 +275,37 @@ struct vfsops overlay_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(overlay_vfsops);
+
+static int
+overlay_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&overlay_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&overlay_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT, CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&overlay_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT, CTLTYPE_NODE, "overlay",
+			       SYSCTL_DESCR("Overlay file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_CREATE, CTL_EOL);
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&overlay_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&overlay_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}

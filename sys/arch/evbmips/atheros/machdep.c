@@ -1,4 +1,4 @@
-/* $NetBSD: machdep.c,v 1.11 2008/03/08 05:05:25 imp Exp $ */
+/* $NetBSD: machdep.c,v 1.13 2008/07/02 17:28:55 ad Exp $ */
 
 /*
  * Copyright (c) 2006 Urbana-Champaign Independent Media Center.
@@ -147,7 +147,7 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.11 2008/03/08 05:05:25 imp Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.13 2008/07/02 17:28:55 ad Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -188,7 +188,6 @@ struct	user *proc0paddr;
 struct cpu_info cpu_info_store;
 
 /* Maps for VM objects. */
-struct vm_map *exec_map = NULL;
 struct vm_map *mb_map = NULL;
 struct vm_map *phys_map = NULL;
 
@@ -213,9 +212,8 @@ cal_timer(void)
 
 	curcpu()->ci_cycles_per_hz = (cntfreq + hz / 2) / hz;
 
-	/* XXX: i don't understand this logic, it was borrowed from Malta */
+	/* Compute number of cycles per 1us (1/MHz). 0.5MHz is for roundup. */
 	curcpu()->ci_divisor_delay = ((cntfreq + 500000) / 1000000);
-	MIPS_SET_CI_RECIPROCAL(curcpu());
 }
 
 void
@@ -382,13 +380,6 @@ cpu_startup(void)
 	printf("total memory = %s\n", pbuf);
 
 	minaddr = 0;
-	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
-
 	/*
 	 * Allocate a submap for physio
 	 */

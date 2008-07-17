@@ -1,4 +1,4 @@
-/*	$NetBSD: proc.h,v 1.276 2008/04/29 13:02:03 ad Exp $	*/
+/*	$NetBSD: proc.h,v 1.280 2008/06/16 09:51:14 ad Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -284,6 +284,7 @@ struct proc {
 	LIST_HEAD(, lwp) p_sigwaiters;	/* p: LWPs waiting for signals */
 	sigpend_t	p_sigpend;	/* p: pending signals */
 	struct lcproc	*p_lwpctl;	/* p, a: _lwp_ctl() information */
+	pid_t		p_ppid;		/* :: cached parent pid */
 
 /*
  * End area that is zeroed on creation
@@ -307,6 +308,7 @@ struct proc {
 	size_t 		p_psnargv;	/* :: offset of ps_nargvstr in above */
 	size_t 		p_psenv;	/* :: offset of ps_envstr in above */
 	size_t 		p_psnenv;	/* :: offset of ps_nenvstr in above */
+	u_int		p_pax;		/* :: PAX flags */
 
 /*
  * End area that is copied on creation
@@ -355,7 +357,6 @@ struct proc {
  * process context only.
  */
 #define	PS_NOCLDSTOP	0x00000008 /* No SIGCHLD when children stop */
-#define	PS_PPWAIT	0x00000010 /* Parent is waiting for child exec/exit */
 #define	PS_WCORE	0x00001000 /* Process needs to dump core */
 #define	PS_WEXIT	0x00002000 /* Working on exiting */
 #define	PS_STOPFORK	0x00800000 /* Child will be stopped on fork(2) */
@@ -383,6 +384,7 @@ struct proc {
  * from process context only.
  */
 #define	PL_CONTROLT	0x00000002 /* Has a controlling terminal */
+#define	PL_PPWAIT	0x00000010 /* Parent is waiting for child exec/exit */
 #define	PL_ORPHANPG	0x20000000 /* Member of an orphaned pgrp */
 
 /*

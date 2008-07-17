@@ -1,4 +1,4 @@
-#	$NetBSD: CP3100,v 1.6 2008/01/19 13:11:13 chris Exp $
+#	$NetBSD: CP3100,v 1.8 2008/06/27 21:10:38 he Exp $
 #
 #	CP3100 -- Certance CP3100 Kernel
 #
@@ -85,6 +85,7 @@ options 	NFS_BOOT_DHCP
 # Compatibility options
 
 #options 	COMPAT_43	# 4.3BSD compatibility.
+#options 	COMPAT_40	# NetBSD 4.0 compatibility.
 #options 	COMPAT_30	# NetBSD 3.0 compatibility.
 #options 	COMPAT_20	# NetBSD 2.0 compatibility.
 #options 	COMPAT_16	# NetBSD 1.6 compatibility.
@@ -143,7 +144,7 @@ options 	DIAGNOSTIC	# internally consistency checks
 options 	DDB		# in-kernel debugger
 options 	DDB_HISTORY_SIZE=100	# Enable history editing in DDB
 #makeoptions	DEBUG="-g"	# compile full symbol table
-options 	SYMTAB_SPACE=340000
+options 	SYMTAB_SPACE=350000
 
 config		netbsd		root on ? type ?
 config		netbsd-wm0	root on wm0 type nfs

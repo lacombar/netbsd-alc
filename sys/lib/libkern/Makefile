@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.87 2008/01/31 02:36:09 matt Exp $
+#	$NetBSD: Makefile,v 1.89 2008/06/30 19:03:59 matt Exp $
 
 LIB=		kern
 NOPIC=		# defined
@@ -45,7 +45,7 @@ SRCS+=	adddi3.c anddi3.c ashldi3.c ashrdi3.c cmpdi2.c divdi3.c iordi3.c \
 .endif
 
 # Other stuff
-SRCS+=	__cmsg_alignbytes.c inet_addr.c intoa.c
+SRCS+=	__cmsg_alignbytes.c cpuset.c inet_addr.c intoa.c
 SRCS+=	md4c.c md5c.c rmd160.c sha1.c sha2.c
 SRCS+=	pmatch.c arc4random.c bcd.c mcount.c mertwist.c
 
@@ -56,7 +56,6 @@ SRCS+=	strtoll.c strtoull.c strtoumax.c
 SRCS+=	xlat_mbr_fstype.c
 
 SRCS+=	rb.c
-COPTS.rb.c+=	-Wno-missing-field-initializers
 
 # Files to clean up
 CLEANFILES+= lib${LIB}.o lib${LIB}.po

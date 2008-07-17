@@ -1,7 +1,7 @@
-/*	$NetBSD: env.c,v 1.3 2008/05/06 18:35:38 dyoung Exp $	*/
+/*	$NetBSD: env.c,v 1.6 2008/07/02 07:44:14 dyoung Exp $	*/
 
 /*-
- * Copyright (c)2008 David Young.  All rights reserved.
+ * Copyright (c) 2008 David Young.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,6 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+#ifndef lint
+__RCSID("$NetBSD: env.c,v 1.6 2008/07/02 07:44:14 dyoung Exp $");
+#endif /* not lint */
 
 #include <errno.h>
 #include <string.h>
@@ -142,7 +147,7 @@ getargstr(prop_dictionary_t env, const char *key, char *buf, size_t buflen)
 	prop_data_t data;
 	size_t datalen;
 
-	data = (prop_data_t)prop_dictionary_get(env, "bssid");
+	data = (prop_data_t)prop_dictionary_get(env, key);
 	if (data == NULL) {
 		errno = ENOENT;
 		return -1;

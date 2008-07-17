@@ -1,8 +1,7 @@
-/*	$NetBSD: af_inetany.c,v 1.5 2008/05/08 07:13:20 dyoung Exp $	*/
+/*	$NetBSD: af_inetany.c,v 1.12 2008/07/02 07:44:14 dyoung Exp $	*/
 
-/*
- * Copyright (c) 1983, 1993
- *      The Regents of the University of California.  All rights reserved.
+/*-
+ * Copyright (c) 2008 David Young.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,26 +11,23 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
  * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: af_inetany.c,v 1.5 2008/05/08 07:13:20 dyoung Exp $");
+__RCSID("$NetBSD: af_inetany.c,v 1.12 2008/07/02 07:44:14 dyoung Exp $");
 #endif /* not lint */
 
 #include <sys/param.h> 
@@ -57,12 +53,10 @@ __RCSID("$NetBSD: af_inetany.c,v 1.5 2008/05/08 07:13:20 dyoung Exp $");
 
 #include "env.h"
 #include "extern.h"
-#include "af_inet.h"
-#include "af_inet6.h"
 #include "af_inetany.h"
 
 static void *
-loadbuf(struct apbuf *b, const struct paddr_prefix *pfx)
+loadbuf(const struct apbuf *b, const struct paddr_prefix *pfx)
 {
 	return memcpy(b->buf, &pfx->pfx_addr,
 	              MIN(b->buflen, pfx->pfx_addr.sa_len));
@@ -70,7 +64,7 @@ loadbuf(struct apbuf *b, const struct paddr_prefix *pfx)
 
 void
 commit_address(prop_dictionary_t env, prop_dictionary_t oenv,
-    struct afparam *param)
+    const struct afparam *param)
 {
 	const char *ifname;
 	int af, rc, s;
@@ -88,8 +82,18 @@ commit_address(prop_dictionary_t env, prop_dictionary_t oenv,
 	if ((ifname = getifinfo(env, oenv, &flags)) == NULL)
 		return;
 
+	strlcpy(param->name[0].buf, ifname, param->name[0].buflen);
+	strlcpy(param->name[1].buf, ifname, param->name[1].buflen);
+
 	if ((d = (prop_data_t)prop_dictionary_get(env, "address")) != NULL)
 		addr = prop_data_data_nocopy(d);
+	else if (!prop_dictionary_get_bool(env, "alias", &alias) || alias ||
+	    param->gifaddr.cmd == 0)
+		return;
+	else if (ioctl(s, param->gifaddr.cmd, param->dgreq.buf) == -1)
+		err(EXIT_FAILURE, param->gifaddr.desc);
+	else if (ioctl(s, param->difaddr.cmd, param->dgreq.buf) == -1)
+		err(EXIT_FAILURE, param->difaddr.desc);
 	else
 		return;
 
@@ -116,43 +120,37 @@ commit_address(prop_dictionary_t env, prop_dictionary_t oenv,
 		delete = !alias;
 	}
 
-	memset(param->req.buf, 0, param->req.buflen);
-	memset(param->dgreq.buf, 0, param->dgreq.buflen);
-
-	strlcpy(param->name[0].buf, ifname, param->name[0].buflen);
-	strlcpy(param->name[1].buf, ifname, param->name[1].buflen);
-
 	loadbuf(&param->addr, addr);
 
 	/* TBD: read matching ifaddr from kernel, use the netmask as default
 	 * TBD: handle preference
 	 */
 	switch (flags & (IFF_BROADCAST|IFF_POINTOPOINT)) {
-	case 0:
-		break;
 	case IFF_BROADCAST:
-		if (mask != NULL)
-			loadbuf(&param->mask, mask);
-		else if (param->defmask.buf != NULL) {
-			memcpy(param->mask.buf, param->defmask.buf,
-			    MIN(param->mask.buflen, param->defmask.buflen));
-		}
 		if (brd != NULL)
 			loadbuf(&param->brd, brd);
+		/*FALLTHROUGH*/
+	case 0:
 		break;
 	case IFF_POINTOPOINT:
-		if (dst == NULL) {
-			errx(EXIT_FAILURE, "no point-to-point "
-			     "destination address");
-		}
 		if (brd != NULL) {
 			errx(EXIT_FAILURE, "%s is not a broadcast interface",
 			    ifname);
 		}
-		loadbuf(&param->dst, dst);
+		if (dst != NULL)
+			loadbuf(&param->dst, dst);
 		break;
 	case IFF_BROADCAST|IFF_POINTOPOINT:
 		errx(EXIT_FAILURE, "unsupported interface flags");
+	}
+	if (param->mask.buf == NULL) {
+		if (mask != NULL)
+			errx(EXIT_FAILURE, "netmask not supported");
+	} else if (mask != NULL)
+		loadbuf(&param->mask, mask);
+	else if (param->defmask.buf != NULL) {
+		memcpy(param->mask.buf, param->defmask.buf,
+		    MIN(param->mask.buflen, param->defmask.buflen));
 	}
 	if (replace) {
 		if (ioctl(s, param->gifaddr.cmd, param->dgreq.buf) == 0) {

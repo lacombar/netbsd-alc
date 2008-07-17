@@ -1,4 +1,4 @@
-/*	$NetBSD: mptramp.S,v 1.14 2008/04/28 20:23:24 martin Exp $	*/
+/*	$NetBSD: mptramp.S,v 1.17 2008/06/27 00:41:39 gmcgarry Exp $	*/
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -76,7 +76,7 @@
  */
 
 #include <machine/asm.h>
-__KERNEL_RCSID(0, "$NetBSD: mptramp.S,v 1.14 2008/04/28 20:23:24 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: mptramp.S,v 1.17 2008/06/27 00:41:39 gmcgarry Exp $");
 	
 #include "opt_mpbios.h"		/* for MPDEBUG */
 		
@@ -174,23 +174,29 @@ _TRMP_LABEL(mp_startup)
         movl    %cr0,%eax               # get control word
                                         # enable paging & NPX emulation
         orl     $(CR0_PE|CR0_PG|CR0_NE|CR0_TS|CR0_EM|CR0_MP|CR0_WP),%eax
-        movl    %eax,%cr0               # and let's page NOW!
+        movl    %eax,%cr0               # and page NOW!
 
 #ifdef MPDEBUG
 	leal    _C_LABEL(cpu_trace),%edi
 #endif
 	HALT(0x6)
 
-# ok, we're now running with paging enabled and sharing page tables with cpu0.
-# figure out which processor we really are, what stack we should be on, etc.
+/*
+ * ok, we are now running with paging enabled and sharing page tables
+ * with cpu0.  figure out which processor we really are, what stack we
+ * should be on, etc.
+ */
 
-	movl	_C_LABEL(local_apic)+LAPIC_ID,%ecx
-	shrl	$LAPIC_ID_SHIFT,%ecx
-	movl	_C_LABEL(cpu_info)(,%ecx,4),%ecx
+	/* Don't touch lapic until BP has done init sequence. */
+1:
+	movl	_C_LABEL(cpu_starting),%ecx
+	pause
+	testl	%ecx, %ecx
+	jz	1b
 	
 	HALTT(0x7, %ecx)
 
-# %ecx points at our cpu_info structure..
+	/* %ecx points at our cpu_info structure. */
 
 	movw    $((MAXGDTSIZ*8) - 1), 6(%esp)	# prepare segment descriptor
 	movl    CPU_INFO_GDT(%ecx), %eax	# for our real gdt
@@ -212,7 +218,7 @@ _TRMP_LABEL(mp_startup)
 	lret
 	.align 4,0x0
 _TRMP_LABEL(gdt_table)   
-	.word   0x0,0x0,0x0,0x0  # null GDTE
+	.word   0x0,0x0,0x0,0x0  # null gdte
 	 GDTE(0x9f,0xcf)         # Kernel text
 	 GDTE(0x93,0xcf)         # Kernel data
 _TRMP_LABEL(gdt_desc)	
@@ -226,7 +232,7 @@ mp_cont:
 	movl	CPU_INFO_IDLELWP(%ecx),%esi
 	movl	L_ADDR(%esi),%esi
 	
-# %esi now points at our PCB.
+	/* %esi now points at our PCB. */
 		
 	HALTT(0x19, %esi)
 	

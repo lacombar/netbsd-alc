@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_subs.c,v 1.202 2008/05/05 17:11:17 ad Exp $	*/
+/*	$NetBSD: nfs_subs.c,v 1.205 2008/07/15 16:06:58 christos Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nfs_subs.c,v 1.202 2008/05/05 17:11:17 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nfs_subs.c,v 1.205 2008/07/15 16:06:58 christos Exp $");
 
 #include "fs_nfs.h"
 #include "opt_nfs.h"
@@ -563,6 +563,7 @@ static const short * const nfsrv_v3errmap[] = {
 	nfsv3err_commit,
 };
 
+extern struct vfs_hooks nfs_export_hooks;
 extern struct nfsrtt nfsrtt;
 extern struct nfsnodehashhead *nfsnodehashtbl;
 extern u_long nfsnodehash;
@@ -1539,6 +1540,7 @@ nfs_init0(void)
 	if (nfs_ticks < 1)
 		nfs_ticks = 1;
 #ifdef NFSSERVER
+	vfs_hooks_attach(&nfs_export_hooks);
 	nfsrv_init(0);			/* Init server data structures */
 	nfsrv_initcache();		/* Init the server request cache */
 	{
@@ -1722,6 +1724,8 @@ nfs_loadattrcache(vpp, fp, vaper, flags)
 	vap->va_rdev = (dev_t)rdev;
 	vap->va_mtime = mtime;
 	vap->va_ctime = ctime;
+	vap->va_birthtime.tv_sec = VNOVAL;
+	vap->va_birthtime.tv_nsec = VNOVAL;
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsidx.__fsid_val[0];
 	switch (vtyp) {
 	case VDIR:
@@ -2668,7 +2672,7 @@ nfs_clearcommit(mp)
 		np->n_commitflags &=
 		    ~(NFS_COMMIT_PUSH_VALID | NFS_COMMIT_PUSHED_VALID);
 		mutex_enter(&vp->v_uobj.vmobjlock);
-		TAILQ_FOREACH(pg, &vp->v_uobj.memq, listq) {
+		TAILQ_FOREACH(pg, &vp->v_uobj.memq, listq.queue) {
 			pg->flags &= ~PG_NEEDCOMMIT;
 		}
 		mutex_exit(&vp->v_uobj.vmobjlock);

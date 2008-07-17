@@ -1,4 +1,4 @@
-/*	$NetBSD: msdosfs_vfsops.c,v 1.65 2008/05/06 18:43:44 ad Exp $	*/
+/*	$NetBSD: msdosfs_vfsops.c,v 1.68 2008/06/28 01:34:05 rumble Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -48,7 +48,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.65 2008/05/06 18:43:44 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.68 2008/06/28 01:34:05 rumble Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_quota.h"
@@ -76,6 +76,7 @@ __KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.65 2008/05/06 18:43:44 ad Exp $
 #include <sys/stat.h>
 #include <sys/conf.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 
 #include <fs/msdosfs/bpb.h>
 #include <fs/msdosfs/bootsect.h>
@@ -83,6 +84,8 @@ __KERNEL_RCSID(0, "$NetBSD: msdosfs_vfsops.c,v 1.65 2008/05/06 18:43:44 ad Exp $
 #include <fs/msdosfs/denode.h>
 #include <fs/msdosfs/msdosfsmount.h>
 #include <fs/msdosfs/fat.h>
+
+MODULE(MODULE_CLASS_VFS, msdosfs, NULL);
 
 #ifdef MSDOSFS_DEBUG
 #define DPRINTF(a) uprintf a
@@ -105,6 +108,8 @@ MALLOC_JUSTDEFINE(M_MSDOSFSFAT, "MSDOSFS fat", "MSDOS FS fat table");
 MALLOC_JUSTDEFINE(M_MSDOSFSTMP, "MSDOSFS temp", "MSDOS FS temp. structures");
 
 #define ROOTNAME "root_device"
+
+static struct sysctllog *msdosfs_sysctl_log;
 
 extern const struct vnodeopv_desc msdosfs_vnodeop_opv_desc;
 
@@ -140,7 +145,47 @@ struct vfsops msdosfs_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(msdosfs_vfsops);
+
+static int
+msdosfs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&msdosfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&msdosfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&msdosfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "msdosfs",
+			       SYSCTL_DESCR("MS-DOS file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 4, CTL_EOL);
+		/*
+		 * XXX the "4" above could be dynamic, thereby eliminating one
+		 * more instance of the "number to vfs" mapping problem, but
+		 * "4" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&msdosfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&msdosfs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}
 
 static int
 update_mp(mp, argp)
@@ -498,7 +543,7 @@ msdosfs_mountfs(devvp, mp, l, argp)
 	 * Read the boot sector of the filesystem, and then check the
 	 * boot signature.  If not a dos boot sector then error out.
 	 */
-	if ((error = bread(devvp, 0, secsize, NOCRED, &bp)) != 0)
+	if ((error = bread(devvp, 0, secsize, NOCRED, 0, &bp)) != 0)
 		goto error_exit;
 	bsp = (union bootsector *)bp->b_data;
 	b33 = (struct byte_bpb33 *)bsp->bs33.bsBPB;
@@ -729,7 +774,7 @@ msdosfs_mountfs(devvp, mp, l, argp)
 		 *	padded at the end or in the middle?
 		 */
 		if ((error = bread(devvp, de_bn2kb(pmp, pmp->pm_fsinfo),
-		    pmp->pm_BytesPerSec, NOCRED, &bp)) != 0)
+		    pmp->pm_BytesPerSec, NOCRED, 0, &bp)) != 0)
 			goto error_exit;
 		fp = (struct fsinfo *)bp->b_data;
 		if (!memcmp(fp->fsisig1, "RRaA", 4)
@@ -1059,25 +1104,4 @@ msdosfs_vget(struct mount *mp, ino_t ino,
 {
 
 	return (EOPNOTSUPP);
-}
-
-SYSCTL_SETUP(sysctl_vfs_msdosfs_setup, "sysctl vfs.msdosfs subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "msdosfs",
-		       SYSCTL_DESCR("MS-DOS file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 4, CTL_EOL);
-	/*
-	 * XXX the "4" above could be dynamic, thereby eliminating one
-	 * more instance of the "number to vfs" mapping problem, but
-	 * "4" is the order as taken from sys/mount.h
-	 */
 }

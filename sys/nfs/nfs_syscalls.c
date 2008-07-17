@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_syscalls.c,v 1.135 2008/04/28 15:06:51 yamt Exp $	*/
+/*	$NetBSD: nfs_syscalls.c,v 1.137 2008/06/24 11:18:14 ad Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nfs_syscalls.c,v 1.135 2008/04/28 15:06:51 yamt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nfs_syscalls.c,v 1.137 2008/06/24 11:18:14 ad Exp $");
 
 #include "fs_nfs.h"
 #include "opt_nfs.h"
@@ -198,7 +198,12 @@ sys_nfssvc(struct lwp *l, const struct sys_nfssvc_args *uap, register_t *retval)
 		if (error)
 			return (error);
 		/* getsock() will use the descriptor for us */
-		error = getsock(nfsdarg.sock, &fp);
+		if ((fp = fd_getfile(nfsdarg.sock)) == NULL)
+			return (EBADF);
+		if (fp->f_type != DTYPE_SOCKET) {
+			fd_putfile(nfsdarg.sock);
+			return (ENOTSOCK);
+		}
 		if (error)
 			return (error);
 		/*
@@ -1100,10 +1105,7 @@ nfs_set_niothreads(int newval)
 {
 	struct nfs_iod *nid;
 	int error = 0;
-
-#if defined(MULTIPROCESSOR)
         int hold_count;
-#endif /* defined(MULTIPROCESSOR) */
 
 	KERNEL_UNLOCK_ALL(curlwp, &hold_count);
 

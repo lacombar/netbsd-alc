@@ -103,7 +103,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.17 2008/01/11 20:00:51 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: intr.c,v 1.20 2008/07/03 14:02:25 drochner Exp $");
 
 #include "opt_multiprocessor.h"
 #include "opt_xen.h"
@@ -209,7 +209,8 @@ cpu_intr_init(struct cpu_info *ci)
 #if NPCI > 0 || NISA > 0
 void *
 intr_establish(int legacy_irq, struct pic *pic, int pin,
-    int type, int level, int (*handler)(void *) , void *arg)
+    int type, int level, int (*handler)(void *) , void *arg,
+    bool known_mpsafe)
 {
 	struct pintrhand *ih;
 	int evtchn;
@@ -259,7 +260,7 @@ xen_intr_map(int *pirq, int type)
 	 */
 	static int xen_next_irq = 200;
 	struct ioapic_softc *ioapic = ioapic_find(APIC_IRQ_APIC(*pirq));
-	struct pic *pic = (struct pic *)ioapic;
+	struct pic *pic = &ioapic->sc_pic;
 	int pin = APIC_IRQ_PIN(*pirq);
 	physdev_op_t op;
 
@@ -297,11 +298,11 @@ struct pic *
 intr_findpic(int num)
 {
 #if NIOAPIC > 0
-	struct pic *pic;
+	struct ioapic_softc *pic;
 
-	pic = (struct pic *)ioapic_find_bybase(num);
+	pic = ioapic_find_bybase(num);
 	if (pic != NULL)
-		return pic;
+		return &pic->sc_pic;
 #endif
 	if (num < NUM_LEGACY_IRQS)
 		return &i8259_pic;
@@ -433,7 +434,7 @@ intr_printconfig(void)
 	CPU_INFO_ITERATOR cii;
 
 	for (CPU_INFO_FOREACH(cii, ci)) {
-		printf("cpu%d: interrupt masks:\n", ci->ci_apicid);
+		printf("%s: interrupt masks:\n", device_xname(ci->ci_dev));
 		for (i = 0; i < NIPL; i++)
 			printf("IPL %d mask %lx unmask %lx\n", i,
 			    (u_long)ci->ci_imask[i], (u_long)ci->ci_iunmask[i]);
@@ -441,8 +442,8 @@ intr_printconfig(void)
 			isp = ci->ci_isources[i];
 			if (isp == NULL)
 				continue;
-			printf("cpu%u source %d is pin %d from pic %s maxlevel %d\n",
-			    ci->ci_apicid, i, isp->is_pin,
+			printf("%s source %d is pin %d from pic %s maxlevel %d\n",
+			    device_xname(ci->ci_dev), i, isp->is_pin,
 			    isp->is_pic->pic_name, isp->is_maxlevel);
 			for (ih = isp->is_handlers; ih != NULL;
 			     ih = ih->ih_next)

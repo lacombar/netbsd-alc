@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_map.c,v 1.254 2008/04/27 11:39:47 ad Exp $	*/
+/*	$NetBSD: uvm_map.c,v 1.262 2008/07/16 00:11:27 matt Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_map.c,v 1.254 2008/04/27 11:39:47 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_map.c,v 1.262 2008/07/16 00:11:27 matt Exp $");
 
 #include "opt_ddb.h"
 #include "opt_uvmhist.h"
@@ -102,7 +102,7 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_map.c,v 1.254 2008/04/27 11:39:47 ad Exp $");
 #include <uvm/uvm_ddb.h>
 #endif
 
-#if defined(UVMMAP_NOCOUNTERS)
+#if !defined(UVMMAP_COUNTERS)
 
 #define	UVMMAP_EVCNT_DEFINE(name)	/* nothing */
 #define UVMMAP_EVCNT_INCR(ev)		/* nothing */
@@ -231,7 +231,8 @@ extern struct vm_map *pager_map; /* XXX */
  * => map need not be locked.
  */
 #define SAVE_HINT(map, check, value) do { \
-	atomic_cas_ptr(&(map)->hint, (check), (value)); \
+	if ((map)->hint == (check)) \
+		(map)->hint = (value); \
 } while (/*CONSTCOND*/ 0)
 
 /*
@@ -1063,7 +1064,7 @@ uvm_map(struct vm_map *map, vaddr_t *startp /* IN/OUT */, vsize_t size,
 	 * for pager_map, allocate the new entry first to avoid sleeping
 	 * for memory while we have the map locked.
 	 *
-	 * besides, because we allocates entries for in-kernel maps
+	 * Also, because we allocate entries for in-kernel maps
 	 * a bit differently (cf. uvm_kmapent_alloc/free), we need to
 	 * allocate them before locking the map.
 	 */
@@ -1322,10 +1323,11 @@ uvm_map_enter(struct vm_map *map, const struct uvm_map_args *args,
 				goto nomerge;
 		}
 
-		if (kmap)
+		if (kmap) {
 			UVMMAP_EVCNT_INCR(kbackmerge);
-		else
+		} else {
 			UVMMAP_EVCNT_INCR(ubackmerge);
+		}
 		UVMHIST_LOG(maphist,"  starting back merge", 0, 0, 0, 0);
 
 		/*
@@ -1437,10 +1439,11 @@ forwardmerge:
 				UVMMAP_EVCNT_INCR(ubimerge);
 			}
 		} else {
-			if (kmap)
+			if (kmap) {
 				UVMMAP_EVCNT_INCR(kforwmerge);
-			else
+			} else {
 				UVMMAP_EVCNT_INCR(uforwmerge);
+			}
 		}
 		UVMHIST_LOG(maphist,"  starting forward merge", 0, 0, 0, 0);
 
@@ -1477,10 +1480,11 @@ forwardmerge:
 nomerge:
 	if (!merged) {
 		UVMHIST_LOG(maphist,"  allocating new map entry", 0, 0, 0, 0);
-		if (kmap)
+		if (kmap) {
 			UVMMAP_EVCNT_INCR(knomerge);
-		else
+		} else {
 			UVMMAP_EVCNT_INCR(unomerge);
+		}
 
 		/*
 		 * allocate new entry and link it in.
@@ -3065,9 +3069,7 @@ uvm_map_protect(struct vm_map *map, vaddr_t start, vaddr_t end,
 
 				if (UVM_OBJ_IS_VNODE(uobj) &&
 				    (current->protection & VM_PROT_EXECUTE)) {
-				    	mutex_enter(&uobj->vmobjlock);
 					vn_markexec((struct vnode *) uobj);
-				    	mutex_exit(&uobj->vmobjlock);
 				}
 			}
 		}
@@ -4137,6 +4139,7 @@ uvmspace_free(struct vmspace *vm)
 	mutex_destroy(&map->misc_lock);
 	mutex_destroy(&map->mutex);
 	rw_destroy(&map->lock);
+	cv_destroy(&map->cv);
 	pmap_destroy(map->pmap);
 	pool_cache_put(&uvm_vmspace_cache, vm);
 }
@@ -4513,7 +4516,8 @@ again:
 
 	va = args.uma_start;
 
-	pmap_kenter_pa(va, VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE);
+	pmap_kenter_pa(va, VM_PAGE_TO_PHYS(pg),
+	    VM_PROT_READ|VM_PROT_WRITE|PMAP_KMPAGE);
 	pmap_update(vm_map_pmap(map));
 
 	ukh = (void *)va;
@@ -4873,7 +4877,7 @@ uvm_object_printit(struct uvm_object *uobj, bool full,
 		return;
 	}
 	(*pr)("  PAGES <pg,offset>:\n  ");
-	TAILQ_FOREACH(pg, &uobj->memq, listq) {
+	TAILQ_FOREACH(pg, &uobj->memq, listq.queue) {
 		cnt++;
 		(*pr)("<%p,0x%llx> ", pg, (long long)pg->offset);
 		if ((cnt % 3) == 0) {
@@ -4898,7 +4902,7 @@ uvm_page_printit(struct vm_page *pg, bool full,
 {
 	struct vm_page *tpg;
 	struct uvm_object *uobj;
-	struct pglist *pgl;
+	struct pgflist *pgl;
 	char pgbuf[128];
 	char pqbuf[128];
 
@@ -4934,7 +4938,7 @@ uvm_page_printit(struct vm_page *pg, bool full,
 			uobj = pg->uobject;
 			if (uobj) {
 				(*pr)("  checking object list\n");
-				TAILQ_FOREACH(tpg, &uobj->memq, listq) {
+				TAILQ_FOREACH(tpg, &uobj->memq, listq.queue) {
 					if (tpg == pg) {
 						break;
 					}
@@ -4959,7 +4963,7 @@ uvm_page_printit(struct vm_page *pg, bool full,
 
 	if (pgl) {
 		(*pr)("  checking pageq list\n");
-		TAILQ_FOREACH(tpg, pgl, pageq) {
+		LIST_FOREACH(tpg, pgl, pageq.list) {
 			if (tpg == pg) {
 				break;
 			}

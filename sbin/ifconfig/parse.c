@@ -1,7 +1,7 @@
-/*	$NetBSD: parse.c,v 1.4 2008/05/07 18:08:30 dyoung Exp $	*/
+/*	$NetBSD: parse.c,v 1.10 2008/07/15 21:27:58 dyoung Exp $	*/
 
 /*-
- * Copyright (c)2008 David Young.  All rights reserved.
+ * Copyright (c) 2008 David Young.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,6 +25,11 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+#ifndef lint
+__RCSID("$NetBSD: parse.c,v 1.10 2008/07/15 21:27:58 dyoung Exp $");
+#endif /* not lint */
+
 #include <err.h>
 #include <errno.h>
 #include <limits.h>
@@ -37,6 +42,7 @@
 #include <arpa/inet.h>
 #include <sys/param.h>
 #include <net/if.h>
+#include <net/if_dl.h>
 #include <netatalk/at.h>
 #include <netiso/iso.h>
 
@@ -143,6 +149,11 @@ pstr_match(const struct parser *p, const struct match *im, struct match *om,
 	uint8_t buf[128];
 	int len;
 
+	if (arg == NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	len = (int)sizeof(buf);
 	if (get_string(arg, NULL, buf, &len) == NULL) {
 		errno = EINVAL;
@@ -174,7 +185,12 @@ pinteger_match(const struct parser *p, const struct match *im, struct match *om,
 	const struct pinteger *pi = (const struct pinteger *)p;
 	char *end;
 	int64_t val;
-	
+
+	if (arg == NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	val = strtoimax(arg, &end, pi->pi_base);
 	if ((val == INTMAX_MIN || val == INTMAX_MAX) && errno == ERANGE)
 		return -1;
@@ -207,6 +223,76 @@ pinteger_match(const struct parser *p, const struct match *im, struct match *om,
 }
 
 static int
+parse_linkaddr(const char *addr, struct sockaddr_storage *ss)
+{
+	static const size_t maxlen =
+	    sizeof(*ss) - offsetof(struct sockaddr_dl, sdl_data[0]);
+	enum {
+		LLADDR_S_INITIAL = 0,
+		LLADDR_S_ONE_OCTET = 1,
+		LLADDR_S_TWO_OCTETS = 2,
+		LLADDR_S_COLON = 3
+	} state = LLADDR_S_INITIAL;
+	uint8_t octet = 0, val;
+	struct sockaddr_dl *sdl;
+	const char *p;
+	int i;
+
+	memset(ss, 0, sizeof(*ss));
+	ss->ss_family = AF_LINK;
+	sdl = (struct sockaddr_dl *)ss;
+
+	for (i = 0, p = addr; i < maxlen; p++) {
+		dbg_warnx("%s.%d: *p == %c, state %d", __func__, __LINE__, *p,
+		    state);
+		if (*p == '\0') {
+			dbg_warnx("%s.%d", __func__, __LINE__);
+			if (state != LLADDR_S_ONE_OCTET &&
+			    state != LLADDR_S_TWO_OCTETS)
+				return -1;
+			dbg_warnx("%s.%d", __func__, __LINE__);
+			sdl->sdl_data[i++] = octet;
+			sdl->sdl_len =
+			    offsetof(struct sockaddr_dl, sdl_data[i]);
+			sdl->sdl_alen = i;
+			return 0;
+		}
+		if (*p == ':') {
+			dbg_warnx("%s.%d", __func__, __LINE__);
+			if (state != LLADDR_S_ONE_OCTET &&
+			    state != LLADDR_S_TWO_OCTETS)
+				return -1;
+			dbg_warnx("%s.%d", __func__, __LINE__);
+			sdl->sdl_data[i++] = octet;
+			state = LLADDR_S_COLON;
+			continue;
+		}
+		if ('a' <= *p && *p <= 'f')
+			val = 10 + *p - 'a';
+		else if ('A' <= *p && *p <= 'F')
+			val = 10 + *p - 'A';
+		else if ('0' <= *p && *p <= '9')
+			val = *p - '0';
+		else
+			return -1;
+
+		dbg_warnx("%s.%d", __func__, __LINE__);
+		if (state == LLADDR_S_ONE_OCTET) {
+			state = LLADDR_S_TWO_OCTETS;
+			octet <<= 4;
+			octet |= val;
+		} else if (state != LLADDR_S_INITIAL && state != LLADDR_S_COLON)
+			return -1;
+		else {
+			state = LLADDR_S_ONE_OCTET;
+			octet = val;
+		}
+		dbg_warnx("%s.%d", __func__, __LINE__);
+	}
+	return -1;
+}
+
+static int
 paddr_match(const struct parser *p, const struct match *im, struct match *om,
     int argidx, const char *arg0)
 {
@@ -217,6 +303,7 @@ paddr_match(const struct parser *p, const struct match *im, struct match *om,
 		struct sockaddr_at sat;
 		struct sockaddr_iso siso;
 		struct sockaddr_in sin;
+		struct sockaddr_storage ss;
 	} u;
 	const struct paddr *pa = (const struct paddr *)p;
 	prop_data_t d;
@@ -231,8 +318,10 @@ paddr_match(const struct parser *p, const struct match *im, struct match *om,
 	long prefixlen = -1;
 	size_t len;
 
-	if (arg0 == NULL)
+	if (arg0 == NULL) {
+		errno = EINVAL;
 		return -1;
+	}
 
 	if (pa->pa_activator != NULL &&
 	    prop_dictionary_get(im->m_env, pa->pa_activator) == NULL)
@@ -321,15 +410,19 @@ paddr_match(const struct parser *p, const struct match *im, struct match *om,
 			u.sat.sat_addr.s_node = node;
 			sa = &u.sa;
 		}
-		if (af != AF_UNSPEC)
-			break;
-		/*FALLTHROUGH*/
+		break;
 	case AF_ISO:
 		u.siso.siso_len = sizeof(u.siso);
 		u.siso.siso_family = AF_ISO;
 		/* XXX iso_addr(3) matches ANYTHING! */
 		u.siso.siso_addr = *iso_addr(arg0);
 		sa = &u.sa;
+		break;
+	case AF_LINK:
+		if (parse_linkaddr(arg0, &u.ss) == -1)
+			sa = NULL;
+		else
+			sa = &u.sa;
 		break;
 	}
 
@@ -578,8 +671,14 @@ pkw_match(const struct parser *p, const struct match *im,
 		if (o == NULL)
 			goto err;
 		break;
-	case KW_T_NUM:
-		o = (prop_object_t)prop_number_create_integer(u->u_num);
+	case KW_T_INT:
+		o = (prop_object_t)prop_number_create_integer(u->u_sint);
+		if (o == NULL)
+			goto err;
+		break;
+	case KW_T_UINT:
+		o = (prop_object_t)prop_number_create_unsigned_integer(
+		    u->u_uint);
 		if (o == NULL)
 			goto err;
 		break;
@@ -649,6 +748,19 @@ piface_create(const char *name, parser_exec_t pexec, const char *defkey,
 }
 
 int
+pbranch_addbranch(struct pbranch *pb, struct parser *p)
+{
+	struct branch *b;
+
+	if ((b = malloc(sizeof(*b))) == NULL)
+		return -1;
+	b->b_nextparser = p;
+	SIMPLEQ_INSERT_HEAD(&pb->pb_branches, b, b_next);
+	pb->pb_parser.p_initialized = false;
+	return parser_init(&pb->pb_parser);
+}
+
+int
 pbranch_setbranches(struct pbranch *pb, const struct branch *brs, size_t nbr)
 {
 	struct branch *b;
@@ -686,11 +798,12 @@ pbranch_init(struct parser *p)
 	struct pbranch *pb = (struct pbranch *)p;
 	struct parser *np;
 
-	if (pb->pb_nbrinit == 0 || !SIMPLEQ_EMPTY(&pb->pb_branches))
-		return 0;
-
-	if (pbranch_setbranches(pb, pb->pb_brinit, pb->pb_nbrinit) == -1)
+	if (pb->pb_nbrinit == 0)
+		;
+	else if (pbranch_setbranches(pb, pb->pb_brinit, pb->pb_nbrinit) == -1)
 		return -1;
+
+	pb->pb_nbrinit = 0;
 
 	SIMPLEQ_FOREACH(b, &pb->pb_branches, b_next) {
 		np = b->b_nextparser;
@@ -746,6 +859,8 @@ pkw_setwords(struct pkw *pk, parser_exec_t defexec, const char *defkey,
 	int i;
 
 	for (i = 0; i < nkw; i++) {
+		if (kws[i].k_word == NULL)
+			continue;
 		if ((k = malloc(sizeof(*k))) == NULL)
 			goto post_pk_err;
 		*k = kws[i];
@@ -774,11 +889,14 @@ pkw_init(struct parser *p)
 	struct pkw *pk = (struct pkw *)p;
 	struct parser *np;
 
-	if (pk->pk_nkwinit == 0 || !SIMPLEQ_EMPTY(&pk->pk_keywords))
-		return 0;
-	if (pkw_setwords(pk, pk->pk_execinit, pk->pk_keyinit, pk->pk_kwinit,
-	    pk->pk_nkwinit, pk->pk_nextinit) == -1)
+	if (pk->pk_nkwinit == 0)
+		;
+	else if (pkw_setwords(pk, pk->pk_execinit, pk->pk_keyinit,
+	    pk->pk_kwinit, pk->pk_nkwinit, pk->pk_nextinit) == -1)
 		return -1;
+
+	pk->pk_nkwinit = 0;
+
 	SIMPLEQ_FOREACH(k, &pk->pk_keywords, k_next) {
 		np = k->k_nextparser;
 		if (np != NULL && parser_init(np) == -1)
@@ -845,7 +963,7 @@ out:
 }
 
 int
-matches_exec(const struct match *matches, prop_dictionary_t xenv, size_t nmatch)
+matches_exec(const struct match *matches, prop_dictionary_t oenv, size_t nmatch)
 {
 	int i, rc = 0;
 	const struct match *m;
@@ -861,11 +979,22 @@ matches_exec(const struct match *matches, prop_dictionary_t xenv, size_t nmatch)
 			continue;
 		dbg_warnx("%s.%d: m->m_parser->p_name %s", __func__, __LINE__,
 		    m->m_parser->p_name);
-		d = prop_dictionary_augment(m->m_env, xenv);
-		rc = (*pexec)(d, xenv);
+		d = prop_dictionary_augment(m->m_env, oenv);
+		rc = (*pexec)(d, oenv);
 		prop_object_release((prop_object_t)d);
 		if (rc == -1)
 			break;
 	}
 	return rc;
+}
+
+int
+parser_init(struct parser *p)
+{
+	if (p->p_initialized)
+		return 0;
+	p->p_initialized = true;
+	if (p->p_methods->pm_init == NULL)
+		return 0;
+	return (*p->p_methods->pm_init)(p);
 }

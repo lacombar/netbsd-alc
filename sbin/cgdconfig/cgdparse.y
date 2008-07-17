@@ -1,5 +1,5 @@
 %{
-/* $NetBSD: cgdparse.y,v 1.3 2008/04/28 20:23:08 martin Exp $ */
+/* $NetBSD: cgdparse.y,v 1.5 2008/07/17 16:24:55 drochner Exp $ */
 
 /*-
  * Copyright (c) 2003 The NetBSD Foundation, Inc.
@@ -32,10 +32,11 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: cgdparse.y,v 1.3 2008/04/28 20:23:08 martin Exp $");
+__RCSID("$NetBSD: cgdparse.y,v 1.5 2008/07/17 16:24:55 drochner Exp $");
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "params.h"
 #include "utils.h"
@@ -66,7 +67,7 @@ static struct params *yy_global_params;
 %token <string> STRINGLIT
 
 %token <token> ALGORITHM KEYLENGTH IVMETHOD VERIFY_METHOD
-%token <token> KEYGEN SALT ITERATIONS KEY
+%token <token> KEYGEN SALT ITERATIONS KEY CMD
 
 %token EOL
 
@@ -99,6 +100,7 @@ kgvars: /* empty */			{ $$ = NULL; }
 kgvar:	  SALT bits EOL			{ $$ = keygen_salt($2); }
 	| ITERATIONS INTEGER EOL	{ $$ = keygen_iterations($2); }
 	| KEY bits EOL			{ $$ = keygen_key($2); }
+	| CMD stringlit EOL		{ $$ = keygen_cmd($2); }
 	| EOL				{ $$ = NULL; }
 
 stringlit:  STRINGLIT | tokstr | intstr

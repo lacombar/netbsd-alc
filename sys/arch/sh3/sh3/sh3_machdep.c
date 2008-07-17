@@ -1,4 +1,4 @@
-/*	$NetBSD: sh3_machdep.c,v 1.72 2008/04/28 20:23:35 martin Exp $	*/
+/*	$NetBSD: sh3_machdep.c,v 1.75 2008/07/02 17:28:56 ad Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2002 The NetBSD Foundation, Inc.
@@ -65,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sh3_machdep.c,v 1.72 2008/04/28 20:23:35 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sh3_machdep.c,v 1.75 2008/07/02 17:28:56 ad Exp $");
 
 #include "opt_kgdb.h"
 #include "opt_memsize.h"
@@ -110,7 +110,6 @@ int cpu_arch;
 int cpu_product;
 char cpu_model[120];
 
-struct vm_map *exec_map;
 struct vm_map *mb_map;
 struct vm_map *phys_map;
 
@@ -271,12 +270,6 @@ sh_startup()
 	printf("total memory = %s\n", pbuf);
 
 	minaddr = 0;
-	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    16 * NCARGS, VM_MAP_PAGEABLE, false, NULL);
 
 	/*
 	 * Allocate a submap for physio
@@ -583,7 +576,7 @@ cpu_getmcontext(l, mcp, flags)
 	__greg_t ras_pc;
 
 	/* Save register context. */
-	gr[_REG_EXPEVT] = tf->tf_expevt;
+	gr[_REG_GBR]    = tf->tf_gbr;
 	gr[_REG_PC]     = tf->tf_spc;
 	gr[_REG_SR]     = tf->tf_ssr;
 	gr[_REG_MACL]   = tf->tf_macl;
@@ -632,7 +625,7 @@ cpu_setmcontext(l, mcp, flags)
 		if (((tf->tf_ssr ^ gr[_REG_SR]) & PSL_USERSTATIC) != 0)
 			return (EINVAL);
 
-		/* _REG_EXPEVT not restored */
+		tf->tf_gbr    = gr[_REG_GBR];
 		tf->tf_spc    = gr[_REG_PC];
 		tf->tf_ssr    = gr[_REG_SR];
 		tf->tf_macl   = gr[_REG_MACL];
@@ -685,6 +678,14 @@ setregs(struct lwp *l, struct exec_package *pack, u_long stack)
 
 	tf = l->l_md.md_regs;
 
+	tf->tf_ssr = PSL_USERSET;
+	tf->tf_spc = pack->ep_entry;
+	tf->tf_pr = 0;
+
+	tf->tf_gbr = 0;
+	tf->tf_macl = 0;
+	tf->tf_mach = 0;
+
 	tf->tf_r0 = 0;
 	tf->tf_r1 = 0;
 	tf->tf_r2 = 0;
@@ -700,8 +701,6 @@ setregs(struct lwp *l, struct exec_package *pack, u_long stack)
 	tf->tf_r12 = 0;
 	tf->tf_r13 = 0;
 	tf->tf_r14 = 0;
-	tf->tf_spc = pack->ep_entry;
-	tf->tf_ssr = PSL_USERSET;
 	tf->tf_r15 = stack;
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: umodem.c,v 1.57 2008/04/28 20:24:00 martin Exp $	*/
+/*	$NetBSD: umodem.c,v 1.59 2008/06/27 16:05:59 drochner Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -44,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umodem.c,v 1.57 2008/04/28 20:24:00 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umodem.c,v 1.59 2008/06/27 16:05:59 drochner Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,17 +115,13 @@ USB_ATTACH(umodem)
 	USB_ATTACH_SUCCESS_RETURN;
 }
 
-#ifdef __strong_alias
-__strong_alias(umodem_activate,umodem_common_activate)
-#else
 int
 umodem_activate(device_ptr_t self, enum devact act)
 {
-	struct umodem_softc *sc = (struct umodem_softc *)self;
+	struct umodem_softc *sc = device_private(self);
 
 	return umodem_common_activate(sc, act);
 }
-#endif
 
 USB_DETACH(umodem)
 {

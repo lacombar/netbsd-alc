@@ -1,4 +1,4 @@
-/* $NetBSD: if_ath_arbus.c,v 1.13 2008/04/28 20:23:28 martin Exp $ */
+/* $NetBSD: if_ath_arbus.c,v 1.15 2008/07/09 19:47:23 joerg Exp $ */
 
 /*-
  * Copyright (c) 2006 Jared D. McNeill <jmcneill@invisible.ca>
@@ -12,6 +12,13 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *        This product includes software developed by the NetBSD
+ *        Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
@@ -27,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ath_arbus.c,v 1.13 2008/04/28 20:23:28 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ath_arbus.c,v 1.15 2008/07/09 19:47:23 joerg Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,15 +75,15 @@ struct ath_arbus_softc {
 	struct ar531x_config	sc_config;
 };
 
-static int	ath_arbus_match(device_t, struct cfdata *, void *);
+static int	ath_arbus_match(device_t, cfdata_t, void *);
 static void	ath_arbus_attach(device_t, device_t, void *);
 static int	ath_arbus_detach(device_t, int);
 
-CFATTACH_DECL(ath_arbus, sizeof(struct ath_arbus_softc),
+CFATTACH_DECL_NEW(ath_arbus, sizeof(struct ath_arbus_softc),
     ath_arbus_match, ath_arbus_attach, ath_arbus_detach, NULL);
 
 static int
-ath_arbus_match(device_t parent, struct cfdata *cf, void *opaque)
+ath_arbus_match(device_t parent, cfdata_t cf, void *opaque)
 {
 	struct arbus_attach_args *aa;
 
@@ -110,9 +117,10 @@ ath_arbus_attach(device_t parent, device_t self, void *opaque)
 
 	asc = device_private(self);
 	sc = &asc->sc_ath;
+	sc->sc_dev = self;
 	aa = (struct arbus_attach_args *)opaque;
 
-	prop = prop_dictionary_get(device_properties(&sc->sc_dev),
+	prop = prop_dictionary_get(device_properties(sc->sc_dev),
 	    "wmac-rev");
 	if (prop == NULL) {
 		printf(": unable to get wmac-rev property\n");
@@ -129,8 +137,7 @@ ath_arbus_attach(device_t parent, device_t self, void *opaque)
 	rv = bus_space_map(asc->sc_iot, aa->aa_addr, aa->aa_size, 0,
 	    &asc->sc_ioh);
 	if (rv) {
-		aprint_error("%s: unable to map registers\n",
-		    sc->sc_dev.dv_xname);
+		aprint_error_dev(self, "unable to map registers\n");
 		return;
 	}
 	/*
@@ -138,11 +145,10 @@ ath_arbus_attach(device_t parent, device_t self, void *opaque)
 	 */
 	rv = ar531x_board_config(&asc->sc_config);
 	if (rv) {
-		aprint_error("%s: unable to locate board configuration\n",
-		    sc->sc_dev.dv_xname);
+		aprint_error_dev(self, "unable to locate board configuration\n");
 		return;
 	}
-	asc->sc_config.unit = sc->sc_dev.dv_unit;	/* XXX? */
+	asc->sc_config.unit = device_unit(sc->sc_dev);
 	asc->sc_config.tag = asc->sc_iot;
 
 	/* NB: the HAL expects the config state passed as the tag */
@@ -153,8 +159,7 @@ ath_arbus_attach(device_t parent, device_t self, void *opaque)
 	asc->sc_ih = arbus_intr_establish(aa->aa_cirq, aa->aa_mirq, ath_intr,
 	    sc);
 	if (asc->sc_ih == NULL) {
-		aprint_error("%s: couldn't establish interrupt\n",
-		    sc->sc_dev.dv_xname);
+		aprint_error_dev(self, "couldn't establish interrupt\n");
 		return;
 	}
 
@@ -166,7 +171,7 @@ ath_arbus_attach(device_t parent, device_t self, void *opaque)
 		pmf_class_network_register(self, &sc->sc_if);
 
 	if (ath_attach(devid, sc) != 0) {
-		aprint_error("%s: ath_attach failed\n", sc->sc_dev.dv_xname);
+		aprint_error_dev(self, "ath_attach failed\n");
 		goto err;
 	}
 

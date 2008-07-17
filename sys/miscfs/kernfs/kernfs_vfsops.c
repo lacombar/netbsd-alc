@@ -1,4 +1,4 @@
-/*	$NetBSD: kernfs_vfsops.c,v 1.84 2008/04/29 18:18:08 ad Exp $	*/
+/*	$NetBSD: kernfs_vfsops.c,v 1.86 2008/06/28 01:34:06 rumble Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.84 2008/04/29 18:18:08 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.86 2008/06/28 01:34:06 rumble Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_compat_netbsd.h"
@@ -57,10 +57,13 @@ __KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.84 2008/04/29 18:18:08 ad Exp $"
 #include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 
 #include <miscfs/genfs/genfs.h>
 #include <miscfs/specfs/specdev.h>
 #include <miscfs/kernfs/kernfs.h>
+
+MODULE(MODULE_CLASS_VFS, kernfs, NULL);
 
 MALLOC_JUSTDEFINE(M_KERNFSMNT, "kernfs mount", "kernfs mount structures");
 
@@ -69,6 +72,8 @@ dev_t rrootdev = NODEV;
 VFS_PROTOS(kernfs);
 
 void	kernfs_get_rrootdev(void);
+
+static struct sysctllog *kernfs_sysctl_log;
 
 void
 kernfs_init()
@@ -234,27 +239,6 @@ kernfs_vget(struct mount *mp, ino_t ino,
 	return (EOPNOTSUPP);
 }
 
-SYSCTL_SETUP(sysctl_vfs_kernfs_setup, "sysctl vfs.kern subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "kernfs",
-		       SYSCTL_DESCR("/kern file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 11, CTL_EOL);
-	/*
-	 * XXX the "11" above could be dynamic, thereby eliminating one
-	 * more instance of the "number to vfs" mapping problem, but
-	 * "11" is the order as taken from sys/mount.h
-	 */
-}
-
 extern const struct vnodeopv_desc kernfs_vnodeop_opv_desc;
 
 const struct vnodeopv_desc * const kernfs_vnodeopv_descs[] = {
@@ -289,4 +273,44 @@ struct vfsops kernfs_vfsops = {
 	0,
 	{ NULL, NULL },
 };
-VFS_ATTACH(kernfs_vfsops);
+
+static int
+kernfs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&kernfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&kernfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&kernfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "kernfs",
+			       SYSCTL_DESCR("/kern file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 11, CTL_EOL);
+		/*
+		 * XXX the "11" above could be dynamic, thereby eliminating one
+		 * more instance of the "number to vfs" mapping problem, but
+		 * "11" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&kernfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&kernfs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}

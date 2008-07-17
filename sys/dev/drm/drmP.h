@@ -1,4 +1,4 @@
-/* $NetBSD: drmP.h,v 1.23 2008/05/06 01:51:00 bjs Exp $ */
+/* $NetBSD: drmP.h,v 1.32 2008/07/07 00:33:23 mrg Exp $ */
 
 /* drmP.h -- Private header for Direct Rendering Manager -*- linux-c -*-
  * Created: Mon Jan  4 10:05:05 1999 by faith@precisioninsight.com
@@ -47,7 +47,9 @@ typedef struct drm_device drm_device_t;
 typedef struct drm_file drm_file_t;
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(_KERNEL_OPT)
 #include <opt_drm.h>
+#endif
 #ifdef DRM_DEBUG
 #undef DRM_DEBUG
 #define DRM_DEBUG_DEFAULT_ON 1
@@ -136,7 +138,9 @@ typedef struct drm_file drm_file_t;
 #include "drm_atomic.h"
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(_KERNEL_OPT)
 #include <opt_drm.h>
+#endif
 #ifdef DRM_DEBUG
 #undef DRM_DEBUG
 #define DRM_DEBUG_DEFAULT_ON 1
@@ -190,7 +194,11 @@ typedef struct drm_file drm_file_t;
 
 #define DRM_IF_VERSION(maj, min) (maj << 16 | min)
 
+#if !defined(_MODULE)
 MALLOC_DECLARE(M_DRM);
+#else
+#define M_DRM M_TEMP
+#endif
 
 #define __OS_HAS_AGP	1
 
@@ -474,7 +482,7 @@ do {									\
 	if (!_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) ||		\
 	     dev->lock.filp != filp) {					\
 		DRM_ERROR("%s called without lock held\n",		\
-			   __func__);				\
+			   __FUNCTION__);				\
 		return EINVAL;						\
 	}								\
 } while (0)
@@ -676,7 +684,7 @@ typedef struct drm_agp_mem {
 } drm_agp_mem_t;
 
 typedef struct drm_agp_head {
-	device_t	   agpdev;
+	void               *agpdev;
 	struct agp_info    info;
 	const char         *chipset;
 	drm_agp_mem_t      *memory;
@@ -833,7 +841,7 @@ typedef struct {
  */
 struct drm_device {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	struct device		device;
+	struct device		*device;
 #endif
 
 	struct drm_driver_info driver;

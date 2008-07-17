@@ -1,4 +1,4 @@
-/*	$NetBSD: umap_vfsops.c,v 1.77 2008/05/05 17:11:17 ad Exp $	*/
+/*	$NetBSD: umap_vfsops.c,v 1.80 2008/06/28 01:34:06 rumble Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umap_vfsops.c,v 1.77 2008/05/05 17:11:17 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umap_vfsops.c,v 1.80 2008/06/28 01:34:06 rumble Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,11 +53,16 @@ __KERNEL_RCSID(0, "$NetBSD: umap_vfsops.c,v 1.77 2008/05/05 17:11:17 ad Exp $");
 #include <sys/namei.h>
 #include <sys/malloc.h>
 #include <sys/kauth.h>
+#include <sys/module.h>
 
 #include <miscfs/umapfs/umap.h>
 #include <miscfs/genfs/layer_extern.h>
 
+MODULE(MODULE_CLASS_VFS, umapfs, NULL);
+
 VFS_PROTOS(umapfs);
+
+static struct sysctllog *umapfs_sysctl_log;
 
 /*
  * Mount umap layer
@@ -267,29 +272,8 @@ umapfs_unmount(struct mount *mp, int mntflags)
 	mutex_destroy(&amp->umapm_hashlock);
 	hashdone(amp->umapm_node_hashtbl, HASH_LIST, amp->umapm_node_hash);
 	free(amp, M_UFSMNT);	/* XXX */
-	mp->mnt_data = 0;
+	mp->mnt_data = NULL;
 	return (0);
-}
-
-SYSCTL_SETUP(sysctl_vfs_umap_setup, "sysctl vfs.umap subtree setup")
-{
-
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "vfs", NULL,
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, CTL_EOL);
-	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT,
-		       CTLTYPE_NODE, "umap",
-		       SYSCTL_DESCR("UID/GID remapping file system"),
-		       NULL, 0, NULL, 0,
-		       CTL_VFS, 10, CTL_EOL);
-	/*
-	 * XXX the "10" above could be dynamic, thereby eliminating
-	 * one more instance of the "number to vfs" mapping problem,
-	 * but "10" is the order as taken from sys/mount.h
-	 */
 }
 
 extern const struct vnodeopv_desc umapfs_vnodeop_opv_desc;
@@ -326,4 +310,44 @@ struct vfsops umapfs_vfsops = {
 	0,				/* vfs_refcount */
 	{ NULL, NULL },
 };
-VFS_ATTACH(umapfs_vfsops);
+
+static int
+umapfs_modcmd(modcmd_t cmd, void *arg)
+{
+	int error;
+
+	switch (cmd) {
+	case MODULE_CMD_INIT:
+		error = vfs_attach(&umapfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_createv(&umapfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "vfs", NULL,
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, CTL_EOL);
+		sysctl_createv(&umapfs_sysctl_log, 0, NULL, NULL,
+			       CTLFLAG_PERMANENT,
+			       CTLTYPE_NODE, "umap",
+			       SYSCTL_DESCR("UID/GID remapping file system"),
+			       NULL, 0, NULL, 0,
+			       CTL_VFS, 10, CTL_EOL);
+		/*
+		 * XXX the "10" above could be dynamic, thereby eliminating
+		 * one more instance of the "number to vfs" mapping problem,
+		 * but "10" is the order as taken from sys/mount.h
+		 */
+		break;
+	case MODULE_CMD_FINI:
+		error = vfs_detach(&umapfs_vfsops);
+		if (error != 0)
+			break;
+		sysctl_teardown(&umapfs_sysctl_log);
+		break;
+	default:
+		error = ENOTTY;
+		break;
+	}
+
+	return (error);
+}

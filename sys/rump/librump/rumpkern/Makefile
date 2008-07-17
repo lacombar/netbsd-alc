@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.33 2008/05/04 12:52:58 ad Exp $
+#	$NetBSD: Makefile,v 1.40 2008/07/16 20:06:20 pooka Exp $
 #
 
 .include <bsd.own.mk>
@@ -19,11 +19,11 @@ SRCS=	rump.c atomic.c auth.c emul.c intr.c genfs_io.c locks.c		\
 SRCS+=	fstrans_stub.c misc_stub.c pmap_stub.c vfsops_stub.c
 
 # sys/kern
-SRCS+=	clock_subr.c kern_descrip.c kern_lock.c kern_stub.c param.c	\
+SRCS+=	clock_subr.c kern_descrip.c kern_stub.c param.c	\
 	subr_bufq.c subr_hash.c subr_prf2.c subr_specificdata.c		\
 	subr_time.c subr_workqueue.c sys_descrip.c sys_generic.c vfs_bio.c \
 	vfs_cache.c vfs_getcwd.c vfs_hooks.c vfs_init.c vfs_lookup.c	\
-	vfs_subr.c vfs_subr2.c vfs_vnops.c vfs_syscalls.c vnode_if.c \
+	vfs_subr.c vfs_vnops.c vfs_syscalls.c vnode_if.c \
 	subr_kobj.c kern_module.c
 
 # sys/miscfs
@@ -44,7 +44,6 @@ OBJS+=	${RUMPUSEROBJDIR}/rumpuser.o ${RUMPUSEROBJDIR}/rumpuser_pth.o
 CPPFLAGS+=	-I${NETBSDSRCDIR}/sys -I${NETBSDSRCDIR}/common/include	\
 		-I${NETBSDSRCDIR}/sys/rump/librump/rumpuser		\
 		-I${.CURDIR}/opt -DMAXUSERS=32
-CPPFLAGS+=	-DRUMP_WITHOUT_THREADS
 
 CFLAGS+=	-Wno-pointer-sign
 
@@ -59,15 +58,25 @@ VOPTORUMPVOP="-e s/vop/rump_vop/g;/VOPARG/!s/VOP/RUMP_VOP/g;/vfs_op_desc/,\$$d"
 VOPTORUMPVOP+="-e s/vm_prot_t/int/g"
 VOPTORUMPVOP+="-e s/voff_t/off_t/g;/sys\/buf\.h/s/.*/struct buf;/"
 RVNH=\#include \"rump.h\"
-rumpvnode_if.c: vnode_if.c
+rumpdefs.h rumpnode_if.h rumpvnode_if.c: vnode_if.c \
+		${NETBSDSRCDIR}/sys/sys/vnode_if.h \
+		${NETBSDSRCDIR}/sys/kern/vnode_if.c \
+		${NETBSDSRCDIR}/sys/sys/namei.h \
+		${NETBSDSRCDIR}/sys/sys/fcntl.h \
+		${NETBSDSRCDIR}/sys/sys/vnode.h \
+		${NETBSDSRCDIR}/sys/sys/errno.h \
+		${.CURDIR}/Makefile
+	echo Regenerating rumpdefs.h rumpnode_if.h and rumpnode_if.c
 	sed ${VOPTORUMPVOP}";s/SYS_VNODE_IF_H/SYS_RUMPVNODE_IF_H/g"	\
 	    < ${NETBSDSRCDIR}/sys/sys/vnode_if.h > rumpvnode_if.h
 	# XXX: some creative kludging to simulate 'a\' (I have no
 	# clue how to make it work in a Makefile
 	sed ${VOPTORUMPVOP}";/sys\/vnode.h/{x;s/.*/${RVNH}/;x;G;n;}"	\
 	    < ${NETBSDSRCDIR}/sys/kern/vnode_if.c > rumpvnode_if.c
-	sed -n '/define/s/NAMEI_/RUMP_NAMEI_/p'				\
+	sed -n '/#define NAMEI_/s/NAMEI_/RUMP_NAMEI_/gp'		\
 	    < ${NETBSDSRCDIR}/sys/sys/namei.h > rumpdefs.h
+	sed -n '/#define	O_[A-Z]*	*0x/s/O_/RUMP_O_/gp'	\
+	    < ${NETBSDSRCDIR}/sys/sys/fcntl.h >> rumpdefs.h
 	printf "#ifndef __VTYPE_DEFINED\n#define __VTYPE_DEFINED\n"	\
 	    >> rumpdefs.h
 	sed -n '/enum vtype.*{/p'					\

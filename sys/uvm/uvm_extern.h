@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_extern.h,v 1.145 2008/02/29 20:35:23 yamt Exp $	*/
+/*	$NetBSD: uvm_extern.h,v 1.147 2008/07/11 07:09:18 skrll Exp $	*/
 
 /*
  *
@@ -143,7 +143,7 @@ typedef voff_t pgoff_t;		/* XXX: number of pages within a uvm object */
 #define UVM_FLAG_AMAPPAD 0x100000 /* for bss: pad amap to reduce malloc() */
 #define UVM_FLAG_TRYLOCK 0x200000 /* fail if we can not lock map */
 #define UVM_FLAG_NOWAIT  0x400000 /* not allowed to sleep */
-#define UVM_FLAG_QUANTUM 0x800000 /* entry never be splitted later */
+#define UVM_FLAG_QUANTUM 0x800000 /* entry can never be split later */
 #define UVM_FLAG_WAITVA  0x1000000 /* wait for va */
 #define UVM_FLAG_VAONLY  0x2000000 /* unmap: no pages are mapped */
 
@@ -326,6 +326,8 @@ struct uvmexp {
 				   aborted */
 	int colorhit;		/* pagealloc where we got optimal color */
 	int colormiss;		/* pagealloc where we didn't */
+	int cpuhit;		/* pagealloc where we allocated locally */
+	int cpumiss;		/* pagealloc where we didn't */
 
 	/* fault subcounters.  XXX: should be 64-bit counters */
 	int fltnoram;	/* number of times fault was out of ram */
@@ -393,8 +395,8 @@ struct uvmexp_sysctl {
 	int64_t	swpgonly;
 	int64_t	nswget;
 	int64_t	unused1; /* used to be nanon */
-	int64_t	unused2; /* used to be nanonneeded */
-	int64_t	unused3; /* used to be nfreeanon */
+	int64_t cpuhit;
+	int64_t cpumiss;
 	int64_t	faults;
 	int64_t	traps;
 	int64_t	intrs;

@@ -1,4 +1,4 @@
-/*	$NetBSD: sequencer.c,v 1.48 2008/04/28 20:23:47 martin Exp $	*/
+/*	$NetBSD: sequencer.c,v 1.50 2008/07/15 16:18:08 christos Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: sequencer.c,v 1.48 2008/04/28 20:23:47 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sequencer.c,v 1.50 2008/07/15 16:18:08 christos Exp $");
 
 #include "sequencer.h"
 
@@ -904,7 +904,7 @@ seq_timer_waitabs(struct sequencer_softc *sc, uint32_t divs)
 	DPRINTFN(4, ("seq_timer_waitabs: adjdivs=%d, sleep when=%ld.%06ld",
 	             divs, when.tv_sec, when.tv_usec));
 	ADDTIMEVAL(&when, &t->reftime); /* abstime for end */
-	ticks = hzto(&when);
+	ticks = tvhzto(&when);
 	DPRINTFN(4, (" when+start=%ld.%06ld, tick=%d\n",
 		     when.tv_sec, when.tv_usec, ticks));
 	if (ticks > 0) {
@@ -1182,7 +1182,7 @@ midiseq_open(int unit, int flags)
 	error = cdev_open(dev, flags, 0, 0);
 	if (error)
 		return (0);
-	sc = device_private(midi_cd.cd_devs[unit]);
+	sc = device_lookup_private(&midi_cd, unit);
 	sc->seqopen = 1;
 	md = malloc(sizeof *md, M_DEVBUF, M_WAITOK|M_ZERO);
 	sc->seq_md = md;

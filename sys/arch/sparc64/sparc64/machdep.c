@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.221 2008/04/28 20:23:37 martin Exp $ */
+/*	$NetBSD: machdep.c,v 1.226 2008/07/10 15:04:41 nakayama Exp $ */
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.
@@ -71,7 +71,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.221 2008/04/28 20:23:37 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.226 2008/07/10 15:04:41 nakayama Exp $");
 
 #include "opt_ddb.h"
 #include "opt_multiprocessor.h"
@@ -142,7 +142,6 @@ int sigpid = 0;
 #endif
 #endif
 
-struct vm_map *exec_map = NULL;
 struct vm_map *mb_map = NULL;
 extern vaddr_t avail_end;
 
@@ -194,12 +193,6 @@ cpu_startup()
 	printf("total memory = %s\n", pbuf);
 
 	minaddr = 0;
-	/*
-	 * Allocate a submap for exec arguments.  This map effectively
-	 * limits the number of processes exec'ing at any time.
-	 */
-        exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-                                 16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Finally, allocate mbuf cluster submap.
@@ -283,7 +276,7 @@ setregs(struct lwp *l, struct exec_package *pack, vaddr_t stack)
 		 * to save it.  In any case, get rid of our FPU state.
 		 */
 		fpusave_lwp(l, false);
-		free((void *)fs, M_SUBPROC);
+		pool_cache_put(fpstate_cache, fs);
 		l->l_md.md_fpstate = NULL;
 	}
 	memset(tf, 0, sizeof *tf);
@@ -599,6 +592,11 @@ haltsys:
 
 	/* If powerdown was requested, do it. */
 	if ((howto & RB_POWERDOWN) == RB_POWERDOWN) {
+#ifdef MULTIPROCESSOR
+		printf("cpu%d: powered down\n\n", cpu_number());
+#else
+		printf("powered down\n\n");
+#endif
 		/* Let the OBP do the work. */
 		OF_poweroff();
 		printf("WARNING: powerdown failed!\n");
@@ -1245,7 +1243,7 @@ _bus_dmamap_unload(bus_dma_tag_t t, bus_dmamap_t map)
 			blast_dcache();
 			break;
 		}
-		TAILQ_FOREACH(pg, pglist, pageq) {
+		TAILQ_FOREACH(pg, pglist, pageq.queue) {
 			pa = VM_PAGE_TO_PHYS(pg);
 
 			/* 
@@ -1294,7 +1292,7 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 			if ((pglist = map->dm_segs[i]._ds_mlist) == NULL)
 				/* Should not really happen. */
 				continue;
-			TAILQ_FOREACH(pg, pglist, pageq) {
+			TAILQ_FOREACH(pg, pglist, pageq.queue) {
 				paddr_t start;
 				psize_t size = PAGE_SIZE;
 
@@ -1368,7 +1366,7 @@ _bus_dmamem_alloc(bus_dma_tag_t t, bus_size_t size, bus_size_t alignment,
 	 * Simply keep a pointer around to the linked list, so
 	 * bus_dmamap_free() can return it.
 	 *
-	 * NOBODY SHOULD TOUCH THE pageq FIELDS WHILE THESE PAGES
+	 * NOBODY SHOULD TOUCH THE pageq.queue FIELDS WHILE THESE PAGES
 	 * ARE IN OUR CUSTODY.
 	 */
 	segs[0]._ds_mlist = pglist;
@@ -1729,7 +1727,7 @@ sparc_mainbus_intr_establish(bus_space_tag_t t, int pil, int level,
 
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
-	intr_establish(pil, ih);
+	intr_establish(pil, level != IPL_VM, ih);
 	return (ih);
 }
 
@@ -1918,7 +1916,7 @@ cpu_setmcontext(struct lwp *l, const mcontext_t *mcp, unsigned int flags)
 		 * by lazy FPU context switching); allocate it if necessary.
 		 */
 		if ((fsp = l->l_md.md_fpstate) == NULL) {
-			fsp = malloc(sizeof (*fsp), M_SUBPROC, M_WAITOK);
+			fsp = pool_cache_get(fpstate_cache, PR_WAITOK);
 			l->l_md.md_fpstate = fsp;
 		} else {
 			/* Drop the live context on the floor. */

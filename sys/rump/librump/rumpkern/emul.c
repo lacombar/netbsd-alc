@@ -1,4 +1,4 @@
-/*	$NetBSD: emul.c,v 1.38 2008/04/24 17:02:18 ad Exp $	*/
+/*	$NetBSD: emul.c,v 1.41 2008/06/25 13:16:58 pooka Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -363,10 +363,16 @@ kthread_create(pri_t pri, int flags, struct cpu_info *ci,
 	int rv;
 
 #ifdef RUMP_WITHOUT_THREADS
-	/* XXX: fake it */
-	if (strcmp(fmt, "vrele") == 0)
+	/* fake them */
+	if (strcmp(fmt, "vrele") == 0) {
+		printf("rump warning: threads not enabled, not starting "
+		   "vrele thread\n");
 		return 0;
-	else
+	} else if (strcmp(fmt, "cachegc") == 0) {
+		printf("rump warning: threads not enabled, not starting "
+		   "namecache g/c thread\n");
+		return 0;
+	} else
 		panic("threads not available, undef RUMP_WITHOUT_THREADS");
 #endif
 
@@ -476,10 +482,16 @@ kpause(const char *wmesg, bool intr, int timeo, kmutex_t *mtx)
 {
 	extern int hz;
 	int rv, error;
-
+	struct timespec time;
+	
 	if (mtx)
 		mutex_exit(mtx);
-	rv = rumpuser_usleep(timeo * (1000000 / hz), &error);
+
+	time.tv_sec = timeo / hz;
+	time.tv_nsec = (timeo % hz) * (1000000000 / hz);
+
+	rv = rumpuser_nanosleep(&time, NULL, &error);
+	
 	if (mtx)
 		mutex_enter(mtx);
 
@@ -555,4 +567,11 @@ const char *
 device_xname(device_t dv)
 {
 	return "bogus0";
+}
+
+void
+assert_sleepable(void)
+{
+
+	/* always sleepable, although we should improve this */
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: bus_dma.c,v 1.42 2008/04/28 20:23:40 martin Exp $	*/
+/*	$NetBSD: bus_dma.c,v 1.45 2008/06/28 17:23:01 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2007 The NetBSD Foundation, Inc.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.42 2008/04/28 20:23:40 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: bus_dma.c,v 1.45 2008/06/28 17:23:01 bouyer Exp $");
 
 /*
  * The following is included because _bus_dma_uiomove is derived from
@@ -171,13 +171,13 @@ _bus_dmamem_alloc_range(bus_dma_tag_t t, bus_size_t size,
 	 * Compute the location, size, and number of segments actually
 	 * returned by the VM code.
 	 */
-	m = mlist.tqh_first;
+	m = TAILQ_FIRST(&mlist);
 	curseg = 0;
 	lastaddr = segs[curseg].ds_addr = VM_PAGE_TO_PHYS(m);
 	segs[curseg].ds_len = PAGE_SIZE;
-	m = m->pageq.tqe_next;
+	m = m->pageq.queue.tqe_next;
 
-	for (; m != NULL; m = m->pageq.tqe_next) {
+	for (; m != NULL; m = m->pageq.queue.tqe_next) {
 		curaddr = VM_PAGE_TO_PHYS(m);
 #ifdef DIAGNOSTIC
 		if (curaddr < low || curaddr >= high) {
@@ -722,7 +722,7 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	 */
 	if (len == 0 || cookie == NULL ||
 	    (cookie->id_flags & X86_DMA_IS_BOUNCING) == 0)
-		return;
+		goto end;
 
 	switch (cookie->id_buftype) {
 	case X86_DMA_BUFTYPE_LINEAR:
@@ -843,6 +843,21 @@ _bus_dmamap_sync(bus_dma_tag_t t, bus_dmamap_t map, bus_addr_t offset,
 	default:
 		printf("unknown buffer type %d\n", cookie->id_buftype);
 		panic("_bus_dmamap_sync");
+	}
+end:
+	if (ops & (BUS_DMASYNC_PREWRITE|BUS_DMASYNC_POSTWRITE)) {
+		/*
+		 * from the memory POV a load can be reordered before a store
+		 * (a load can fetch data from the write buffers, before
+		 * data hits the cache or memory), a mfence avoids it.
+		 */
+		x86_mfence();
+	} else if (ops & (BUS_DMASYNC_PREREAD|BUS_DMASYNC_POSTREAD)) {
+		/*
+		 * all past reads should have completed at before this point,
+		 * and futur reads should not have started yet.
+		 */
+		x86_lfence();
 	}
 }
 
@@ -986,7 +1001,7 @@ _bus_dmamem_free(bus_dma_tag_t t, bus_dma_segment_t *segs, int nsegs)
 		    addr < (segs[curseg].ds_addr + segs[curseg].ds_len);
 		    addr += PAGE_SIZE) {
 			m = _BUS_BUS_TO_VM_PAGE(addr);
-			TAILQ_INSERT_TAIL(&mlist, m, pageq);
+			TAILQ_INSERT_TAIL(&mlist, m, pageq.queue);
 		}
 	}
 
@@ -1092,7 +1107,7 @@ _bus_dmamem_unmap(bus_dma_tag_t t, void *kva, size_t size)
 }
 
 /*
- * Common functin for mmap(2)'ing DMA-safe memory.  May be called by
+ * Common function for mmap(2)'ing DMA-safe memory.  May be called by
  * bus-specific DMA mmap(2)'ing functions.
  */
 paddr_t

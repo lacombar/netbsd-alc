@@ -1,4 +1,4 @@
-/*	$NetBSD: lock_stubs.S,v 1.19 2008/05/06 23:03:03 ad Exp $	*/
+/*	$NetBSD: lock_stubs.S,v 1.21 2008/06/27 18:16:02 ad Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <machine/asm.h>
-__KERNEL_RCSID(0, "$NetBSD: lock_stubs.S,v 1.19 2008/05/06 23:03:03 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: lock_stubs.S,v 1.21 2008/06/27 18:16:02 ad Exp $");
 
 #include "opt_multiprocessor.h"
 #include "opt_lockdebug.h"
@@ -226,18 +226,18 @@ ENTRY(mutex_spin_enter)
 	movl	4(%esp), %edx
 	movb	CPUVAR(ILEVEL), %cl
 	movb	MTX_IPL(%edx), %ch
+	movl	$0x01, %eax
 	cmpb	%ch, %cl
 	jg	1f
 	movb	%ch, CPUVAR(ILEVEL)		/* splraiseipl() */
 1:
-	subl	$1, CPUVAR(MTX_COUNT)		/* decl does not set CF */
+	subl	%eax, CPUVAR(MTX_COUNT)		/* decl does not set CF */
 	jnc	2f
 	movb	%cl, CPUVAR(MTX_OLDSPL)
 2:
 #ifdef FULL
-	mov	$0x0100, %eax			/* new + expected value */
-	LOCK(11)
-	cmpxchgb %ah, MTX_LOCK(%edx)		/* lock it */
+	xchgb	%al, MTX_LOCK(%edx)		/* lock it */
+	testb	%al, %al
 	jnz	3f
 #endif
 	ret
@@ -271,7 +271,7 @@ LABEL(mutex_spin_exit_end)
 END(mutex_spin_exit)
 
 /*
- * Patch for i686 CPUs where cli/sti is prohibitavely expensive.
+ * Patch for i686 CPUs where cli/sti is prohibitively expensive.
  * Must be the same size as mutex_spin_exit().
  */
 ENTRY(i686_mutex_spin_exit)
@@ -320,7 +320,7 @@ ENTRY(mutex_spin_exit)
 /*
  * Spinlocks.
  */
-NENTRY(__cpu_simple_lock_init)
+ENTRY(__cpu_simple_lock_init)
 	movl	4(%esp), %edx
 	movb	$0, (%edx)
 	ret
@@ -344,13 +344,13 @@ NENTRY(__cpu_simple_lock)
 	jmp	2b
 END(__cpu_simple_lock)
 
-NENTRY(__cpu_simple_unlock)
+ENTRY(__cpu_simple_unlock)
 	movl	4(%esp), %edx
 	movb	$0, (%edx)
 	ret
 END(__cpu_simple_unlock)
 
-NENTRY(__cpu_simple_lock_try)
+ENTRY(__cpu_simple_lock_try)
 	movl	4(%esp), %edx
 	movl	$0x0100, %eax
 	LOCK(7)
@@ -370,8 +370,5 @@ LABEL(x86_lockpatch)
 	.long	.Lpatch1, .Lpatch2, .Lpatch3, .Lpatch4
 	.long	.Lpatch5, .Lpatch6, .Lpatch7, .Lpatch12
 	.long	.Lpatch13
-#if defined(FULL) && !defined(__XEN__)
-	.long	.Lpatch11
-#endif
 	.long	0
 #endif

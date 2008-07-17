@@ -1,8 +1,8 @@
-#	$NetBSD: files,v 1.905 2008/05/05 13:42:15 ad Exp $
+#	$NetBSD: files,v 1.910 2008/07/16 20:06:19 pooka Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
 
-version 	20070109
+version 	20080610
 
 #
 # device classes
@@ -1067,8 +1067,8 @@ define	fwbus	{ }			# IEEE 1394 attachment
 define	vmebus	{ }			# VME bus attachment
 define	acpibus	{ }			# ACPI "bus" attachment
 define	pcmciabus { [controller = -1], [socket = -1]}	# PCMCIA bus attachment
-define	cbbus	{[slot = -1]}		# CardBus attachment
-define	pcmciaslot {[slot = -1]}	# PCMCIA slot itself
+define	cbbus	{ }			# CardBus attachment
+define	pcmciaslot { }			# PCMCIA slot itself
 
 # We need the USB bus controllers here so different busses can
 # use them in an 'attach-with'.
@@ -1178,11 +1178,11 @@ file	dev/ic/iavc.c			iavc
 
 # legitimate pseudo-devices
 #
-defpseudo vnd { }:	disk
+defpseudodev vnd:	disk
 defflag opt_vnd.h	VND_COMPRESSION
 defpseudo ccd:		disk
 defpseudo cgd:		disk, des, blowfish, cast128, rijndael
-defpseudo md { }:	disk
+defpseudodev md:	disk
 defpseudo fss:		disk
 
 defpseudo pty:		tty
@@ -1207,9 +1207,9 @@ defpseudo gif:		ifnet
 defpseudo faith:	ifnet
 defpseudo srt:		ifnet
 defpseudo stf:		ifnet
-defpseudo tap { }:	ifnet, ether, arp, bpf_filter
+defpseudodev tap:	ifnet, ether, arp, bpf_filter
 defpseudo carp:		ifnet, ether, arp, bpf_filter
-defpseudo etherip { }:	ifnet, ether, arp, bpf_filter
+defpseudodev etherip:	ifnet, ether, arp, bpf_filter
 
 defpseudo sequencer
 defpseudo clockctl
@@ -1243,7 +1243,7 @@ defpseudo fwiso:	ieee1394
 
 # driver attach / detach user interface
 defpseudo drvctl
-file	kern/kern_drvctl.c		drvctl
+file	kern/kern_drvctl.c		drvctl		needs-flag
 
 # cpu control
 defpseudo cpuctl
@@ -1472,7 +1472,6 @@ file	kern/vfs_init.c
 file	kern/vfs_lockf.c
 file	kern/vfs_lookup.c
 file	kern/vfs_subr.c
-file	kern/vfs_subr2.c
 file	kern/vfs_syscalls.c
 file	kern/vfs_trans.c
 file	kern/vfs_vnops.c
