@@ -215,7 +215,7 @@ struct if_clone tap_cloners = IF_CLONE_INITIALIZER("tap",
 
 /* Helper functionis shared by the two cloning code paths */
 static struct tap_softc *	tap_clone_creator(int);
-int	tap_clone_destroyer(device_t);
+static int			tap_clone_destroyer(device_t);
 
 void
 tapattach(int n)
@@ -412,7 +412,8 @@ tap_mediachange(struct ifnet *ifp)
 static void
 tap_mediastatus(struct ifnet *ifp, struct ifmediareq *imr)
 {
-	struct tap_softc *sc = (struct tap_softc *)ifp->if_softc;
+	struct tap_softc *sc = ifp->if_softc;
+
 	imr->ifm_active = sc->sc_im.ifm_cur->ifm_media;
 }
 
@@ -446,7 +447,7 @@ tap_mediastatus(struct ifnet *ifp, struct ifmediareq *imr)
 static void
 tap_start(struct ifnet *ifp)
 {
-	struct tap_softc *sc = (struct tap_softc *)ifp->if_softc;
+	struct tap_softc *sc = ifp->if_softc;
 	struct mbuf *m0;
 
 	if ((sc->sc_flags & TAP_INUSE) == 0) {
@@ -507,8 +508,8 @@ tap_softintr(void *cookie)
 static int
 tap_ioctl(struct ifnet *ifp, u_long cmd, void *data)
 {
-	struct tap_softc *sc = (struct tap_softc *)ifp->if_softc;
-	struct ifreq *ifr = (struct ifreq *)data;
+	struct tap_softc *sc = ifp->if_softc;
+	struct ifreq *ifr = data;
 	int s, error;
 
 	s = splnet();
@@ -522,7 +523,7 @@ tap_ioctl(struct ifnet *ifp, u_long cmd, void *data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_im, cmd);
 		break;
 	case SIOCSIFPHYADDR:
-		error = tap_lifaddr(ifp, cmd, (struct ifaliasreq *)data);
+		error = tap_lifaddr(ifp, cmd, data);
 		break;
 	default:
 		error = ether_ioctl(ifp, cmd, data);
@@ -561,6 +562,7 @@ tap_lifaddr(struct ifnet *ifp, u_long cmd, struct ifaliasreq *ifra)
 static int
 tap_init(struct ifnet *ifp)
 {
+
 	ifp->if_flags |= IFF_RUNNING;
 
 	tap_start(ifp);
@@ -579,7 +581,7 @@ tap_init(struct ifnet *ifp)
 static void
 tap_stop(struct ifnet *ifp, int disable)
 {
-	struct tap_softc *sc = (struct tap_softc *)ifp->if_softc;
+	struct tap_softc *sc = ifp->if_softc;
 
 	ifp->if_flags &= ~IFF_RUNNING;
 	wakeup(sc);
@@ -598,6 +600,7 @@ tap_stop(struct ifnet *ifp, int disable)
 static int
 tap_clone_create(struct if_clone *ifc, int unit)
 {
+
 	if (tap_clone_creator(unit) == NULL) {
 		aprint_error("%s%d: unable to attach an instance\n",
                     tap_cd.cd_name, unit);
@@ -647,7 +650,7 @@ tap_clone_destroy(struct ifnet *ifp)
 	return tap_clone_destroyer(sc->sc_dev);
 }
 
-int
+static int
 tap_clone_destroyer(device_t dev)
 {
 	cfdata_t cf = device_cfdata(dev);
@@ -755,8 +758,7 @@ tap_dev_cloner(struct lwp *l)
  * created it closes it.
  */
 static int
-tap_cdev_close(dev_t dev, int flags, int fmt,
-    struct lwp *l)
+tap_cdev_close(dev_t dev, int flags, int fmt, struct lwp *l)
 {
 	struct tap_softc *sc =
 	    device_lookup_private(&tap_cd, minor(dev));
@@ -841,6 +843,7 @@ tap_dev_close(struct tap_softc *sc)
 static int
 tap_cdev_read(dev_t dev, struct uio *uio, int flags)
 {
+
 	return tap_dev_read(minor(dev), uio, flags);
 }
 
@@ -859,8 +862,7 @@ tap_fops_read(file_t *fp, off_t *offp, struct uio *uio,
 static int
 tap_dev_read(int unit, struct uio *uio, int flags)
 {
-	struct tap_softc *sc =
-	    device_lookup_private(&tap_cd, unit);
+	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 	struct ifnet *ifp;
 	struct mbuf *m, *n;
 	int error = 0, s;
@@ -944,6 +946,7 @@ out:
 static int
 tap_cdev_write(dev_t dev, struct uio *uio, int flags)
 {
+
 	return tap_dev_write(minor(dev), uio, flags);
 }
 
@@ -1016,23 +1019,23 @@ tap_dev_write(int unit, struct uio *uio, int flags)
 }
 
 static int
-tap_cdev_ioctl(dev_t dev, u_long cmd, void *data, int flags,
-    struct lwp *l)
+tap_cdev_ioctl(dev_t dev, u_long cmd, void *data, int flags, struct lwp *l)
 {
+
 	return tap_dev_ioctl(minor(dev), cmd, data, l);
 }
 
 static int
 tap_fops_ioctl(file_t *fp, u_long cmd, void *data)
 {
+
 	return tap_dev_ioctl((intptr_t)fp->f_data, cmd, data, curlwp);
 }
 
 static int
 tap_dev_ioctl(int unit, u_long cmd, void *data, struct lwp *l)
 {
-	struct tap_softc *sc =
-	    device_lookup_private(&tap_cd, unit);
+	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 	int error = 0;
 
 	if (sc == NULL)
@@ -1095,20 +1098,21 @@ tap_dev_ioctl(int unit, u_long cmd, void *data, struct lwp *l)
 static int
 tap_cdev_poll(dev_t dev, int events, struct lwp *l)
 {
+
 	return tap_dev_poll(minor(dev), events, l);
 }
 
 static int
 tap_fops_poll(file_t *fp, int events)
 {
+
 	return tap_dev_poll((intptr_t)fp->f_data, events, curlwp);
 }
 
 static int
 tap_dev_poll(int unit, int events, struct lwp *l)
 {
-	struct tap_softc *sc =
-	    device_lookup_private(&tap_cd, unit);
+	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 	int revents = 0;
 
 	if (sc == NULL)
@@ -1136,28 +1140,29 @@ tap_dev_poll(int unit, int events, struct lwp *l)
 	return (revents);
 }
 
-static struct filterops tap_read_filterops = { 1, NULL, tap_kqdetach,
-	tap_kqread };
-static struct filterops tap_seltrue_filterops = { 1, NULL, tap_kqdetach,
-	filt_seltrue };
+static struct filterops tap_read_filterops =
+    { 1, NULL, tap_kqdetach, tap_kqread };
+static struct filterops tap_seltrue_filterops =
+    { 1, NULL, tap_kqdetach, filt_seltrue };
 
 static int
 tap_cdev_kqfilter(dev_t dev, struct knote *kn)
 {
+
 	return tap_dev_kqfilter(minor(dev), kn);
 }
 
 static int
 tap_fops_kqfilter(file_t *fp, struct knote *kn)
 {
+
 	return tap_dev_kqfilter((intptr_t)fp->f_data, kn);
 }
 
 static int
 tap_dev_kqfilter(int unit, struct knote *kn)
 {
-	struct tap_softc *sc =
-	    device_lookup_private(&tap_cd, unit);
+	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 
 	if (sc == NULL)
 		return (ENXIO);
@@ -1186,7 +1191,7 @@ tap_dev_kqfilter(int unit, struct knote *kn)
 static void
 tap_kqdetach(struct knote *kn)
 {
-	struct tap_softc *sc = (struct tap_softc *)kn->kn_hook;
+	struct tap_softc *sc = kn->kn_hook;
 
 	KERNEL_LOCK(1, NULL);
 	simple_lock(&sc->sc_kqlock);
@@ -1198,7 +1203,7 @@ tap_kqdetach(struct knote *kn)
 static int
 tap_kqread(struct knote *kn, long hint)
 {
-	struct tap_softc *sc = (struct tap_softc *)kn->kn_hook;
+	struct tap_softc *sc = kn->kn_hook;
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
 	struct mbuf *m;
 	int s, rv;
