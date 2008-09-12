@@ -1586,12 +1586,12 @@ fd_dupopen(int old, int *new, int mode, int error)
 		}
 
 		/* Copy it. */
-		error = fd_dup(fp, 0, new, fdp->fd_ofiles[old]->ff_exclose);
+		error = fd_dup(fp, 0, new, ff->ff_exclose);
 		break;
 
 	case EMOVEFD:
 		/* Copy it. */
-		error = fd_dup(fp, 0, new, fdp->fd_ofiles[old]->ff_exclose);
+		error = fd_dup(fp, 0, new, ff->ff_exclose);
 		if (error != 0) {
 			break;
 		}
