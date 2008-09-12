@@ -124,11 +124,11 @@ extern struct cfdriver tap_cd;
 
 /* Real device access routines */
 static int	tap_dev_close(struct tap_softc *);
-static int	tap_dev_read(int, struct uio *, int);
-static int	tap_dev_write(int, struct uio *, int);
-static int	tap_dev_ioctl(int, u_long, void *, struct lwp *);
-static int	tap_dev_poll(int, int, struct lwp *);
-static int	tap_dev_kqfilter(int, struct knote *);
+static int	tap_dev_read(struct tap_softc *, struct uio *, int);
+static int	tap_dev_write(struct tap_softc *, struct uio *, int);
+static int	tap_dev_ioctl(struct tap_softc *, u_long, void *, struct lwp *);
+static int	tap_dev_poll(struct tap_softc *, int, struct lwp *);
+static int	tap_dev_kqfilter(struct tap_softc *, struct knote *);
 
 /* Fileops access routines */
 static int	tap_fops_close(file_t *);
@@ -152,7 +152,7 @@ static const struct fileops tap_fileops = {
 };
 
 /* Helper for cloning open() */
-static int	tap_dev_cloner(struct lwp *);
+static int	tap_dev_cloner(void);
 
 /* Character device routines */
 static int	tap_cdev_open(dev_t, int, int, struct lwp *);
@@ -215,7 +215,7 @@ struct if_clone tap_cloners = IF_CLONE_INITIALIZER("tap",
 
 /* Helper functionis shared by the two cloning code paths */
 static struct tap_softc *	tap_clone_creator(int);
-static int			tap_clone_destroyer(device_t);
+static int			tap_clone_destroyer(struct tap_softc *);
 
 void
 tapattach(int n)
@@ -647,17 +647,17 @@ tap_clone_destroy(struct ifnet *ifp)
 {
 	struct tap_softc *sc = ifp->if_softc;
 
-	return tap_clone_destroyer(sc->sc_dev);
+	return tap_clone_destroyer(sc);
 }
 
 static int
-tap_clone_destroyer(device_t dev)
+tap_clone_destroyer(struct tap_softc *sc)
 {
-	cfdata_t cf = device_cfdata(dev);
+	cfdata_t cf = device_cfdata(sc->sc_dev);
 	int error;
 
-	if ((error = config_detach(dev, 0)) != 0)
-		aprint_error_dev(dev, "unable to detach instance\n");
+	if ((error = config_detach(sc->sc_dev, 0)) != 0)
+		aprint_error_dev(sc->sc_dev, "unable to detach instance\n");
 	free(cf, M_DEVBUF);
 
 	return (error);
@@ -690,8 +690,9 @@ tap_cdev_open(dev_t dev, int flags, int fmt, struct lwp *l)
 {
 	struct tap_softc *sc;
 
-	if (minor(dev) == TAP_CLONER)
-		return tap_dev_cloner(l);
+	if (minor(dev) == TAP_CLONER) {
+		return tap_dev_cloner();
+	}
 
 	sc = device_lookup_private(&tap_cd, minor(dev));
 	if (sc == NULL)
@@ -727,7 +728,7 @@ tap_cdev_open(dev_t dev, int flags, int fmt, struct lwp *l)
  */
 
 static int
-tap_dev_cloner(struct lwp *l)
+tap_dev_cloner()
 {
 	struct tap_softc *sc;
 	file_t *fp;
@@ -743,8 +744,7 @@ tap_dev_cloner(struct lwp *l)
 
 	sc->sc_flags |= TAP_INUSE;
 
-	return fd_clone(fp, fd, FREAD|FWRITE, &tap_fileops,
-	    (void *)(intptr_t)device_unit(sc->sc_dev));
+	return fd_clone(fp, fd, FREAD|FWRITE, &tap_fileops, sc);
 }
 
 /*
@@ -760,11 +760,7 @@ tap_dev_cloner(struct lwp *l)
 static int
 tap_cdev_close(dev_t dev, int flags, int fmt, struct lwp *l)
 {
-	struct tap_softc *sc =
-	    device_lookup_private(&tap_cd, minor(dev));
-
-	if (sc == NULL)
-		return (ENXIO);
+	struct tap_softc *sc = device_lookup_private(&tap_cd, minor(dev));
 
 	return tap_dev_close(sc);
 }
@@ -778,13 +774,10 @@ tap_cdev_close(dev_t dev, int flags, int fmt, struct lwp *l)
 static int
 tap_fops_close(file_t *fp)
 {
-	int unit = (intptr_t)fp->f_data;
 	struct tap_softc *sc;
 	int error;
 
-	sc = device_lookup_private(&tap_cd, unit);
-	if (sc == NULL)
-		return (ENXIO);
+	sc = fp->f_data;
 
 	/* tap_dev_close currently always succeeds, but it might not
 	 * always be the case. */
@@ -801,7 +794,7 @@ tap_fops_close(file_t *fp)
 		return (0);
 	}
 
-	error = tap_clone_destroyer(sc->sc_dev);
+	error = tap_clone_destroyer(sc);
 	KERNEL_UNLOCK_ONE(NULL);
 	return error;
 }
@@ -811,6 +804,9 @@ tap_dev_close(struct tap_softc *sc)
 {
 	struct ifnet *ifp;
 	int s;
+
+	if (sc == NULL)
+		return (ENXIO);
 
 	s = splnet();
 	/* Let tap_start handle packets again */
@@ -843,8 +839,9 @@ tap_dev_close(struct tap_softc *sc)
 static int
 tap_cdev_read(dev_t dev, struct uio *uio, int flags)
 {
+	struct tap_softc *sc = device_lookup_private(&tap_cd, minor(dev));
 
-	return tap_dev_read(minor(dev), uio, flags);
+	return tap_dev_read(sc, uio, flags);
 }
 
 static int
@@ -854,15 +851,14 @@ tap_fops_read(file_t *fp, off_t *offp, struct uio *uio,
 	int error;
 
 	KERNEL_LOCK(1, NULL);
-	error = tap_dev_read((intptr_t)fp->f_data, uio, flags);
+	error = tap_dev_read(fp->f_data, uio, flags);
 	KERNEL_UNLOCK_ONE(NULL);
 	return error;
 }
 
 static int
-tap_dev_read(int unit, struct uio *uio, int flags)
+tap_dev_read(struct tap_softc *sc, struct uio *uio, int flags)
 {
-	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 	struct ifnet *ifp;
 	struct mbuf *m, *n;
 	int error = 0, s;
@@ -946,8 +942,9 @@ out:
 static int
 tap_cdev_write(dev_t dev, struct uio *uio, int flags)
 {
+	struct tap_softc *sc = device_lookup_private(&tap_cd, minor(dev));
 
-	return tap_dev_write(minor(dev), uio, flags);
+	return tap_dev_write(sc, uio, flags);
 }
 
 static int
@@ -957,18 +954,16 @@ tap_fops_write(file_t *fp, off_t *offp, struct uio *uio,
 	int error;
 
 	KERNEL_LOCK(1, NULL);
-	error = tap_dev_write((intptr_t)fp->f_data, uio, flags);
+	error = tap_dev_write(fp->f_data, uio, flags);
 	KERNEL_UNLOCK_ONE(NULL);
 	return error;
 }
 
 static int
-tap_dev_write(int unit, struct uio *uio, int flags)
+tap_dev_write(struct tap_softc *sc, struct uio *uio, int flags)
 {
-	struct tap_softc *sc =
-	    device_lookup_private(&tap_cd, unit);
-	struct ifnet *ifp;
 	struct mbuf *m, **mp;
+	struct ifnet *ifp;
 	int error = 0;
 	int s;
 
@@ -1021,21 +1016,21 @@ tap_dev_write(int unit, struct uio *uio, int flags)
 static int
 tap_cdev_ioctl(dev_t dev, u_long cmd, void *data, int flags, struct lwp *l)
 {
+	struct tap_softc *sc = device_lookup_private(&tap_cd, minor(dev));
 
-	return tap_dev_ioctl(minor(dev), cmd, data, l);
+	return tap_dev_ioctl(sc, cmd, data, l);
 }
 
 static int
 tap_fops_ioctl(file_t *fp, u_long cmd, void *data)
 {
 
-	return tap_dev_ioctl((intptr_t)fp->f_data, cmd, data, curlwp);
+	return tap_dev_ioctl(fp->f_data, cmd, data, curlwp);
 }
 
 static int
-tap_dev_ioctl(int unit, u_long cmd, void *data, struct lwp *l)
+tap_dev_ioctl(struct tap_softc *sc, u_long cmd, void *data, struct lwp *l)
 {
-	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 	int error = 0;
 
 	if (sc == NULL)
@@ -1098,21 +1093,21 @@ tap_dev_ioctl(int unit, u_long cmd, void *data, struct lwp *l)
 static int
 tap_cdev_poll(dev_t dev, int events, struct lwp *l)
 {
+	struct tap_softc *sc = device_lookup_private(&tap_cd, minor(dev));
 
-	return tap_dev_poll(minor(dev), events, l);
+	return tap_dev_poll(sc, events, l);
 }
 
 static int
 tap_fops_poll(file_t *fp, int events)
 {
 
-	return tap_dev_poll((intptr_t)fp->f_data, events, curlwp);
+	return tap_dev_poll(fp->f_data, events, curlwp);
 }
 
 static int
-tap_dev_poll(int unit, int events, struct lwp *l)
+tap_dev_poll(struct tap_softc *sc, int events, struct lwp *l)
 {
-	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 	int revents = 0;
 
 	if (sc == NULL)
@@ -1148,21 +1143,21 @@ static struct filterops tap_seltrue_filterops =
 static int
 tap_cdev_kqfilter(dev_t dev, struct knote *kn)
 {
+	struct tap_softc *sc = device_lookup_private(&tap_cd, minor(dev));
 
-	return tap_dev_kqfilter(minor(dev), kn);
+	return tap_dev_kqfilter(sc, kn);
 }
 
 static int
 tap_fops_kqfilter(file_t *fp, struct knote *kn)
 {
 
-	return tap_dev_kqfilter((intptr_t)fp->f_data, kn);
+	return tap_dev_kqfilter(fp->f_data, kn);
 }
 
 static int
-tap_dev_kqfilter(int unit, struct knote *kn)
+tap_dev_kqfilter(struct tap_softc *sc, struct knote *kn)
 {
-	struct tap_softc *sc = device_lookup_private(&tap_cd, unit);
 
 	if (sc == NULL)
 		return (ENXIO);
