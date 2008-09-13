@@ -320,8 +320,10 @@ tap_attach(device_t parent, device_t self, void *aux)
 	 * This field will be unused if the interface was created by
 	 * ifconfig(8) and accessed later through /dev/tapN. However, if the
 	 * interface was created using the cloner device node, we will keep
-	 * track of the vnode structure of this node, use it during the
-	 * fo_stat() call and override just enough to point to the real node */
+	 * track of the vnode structure of the closer device, use it during
+	 * the fo_stat() call and finally override just enough to point to the
+	 * effective interface
+	 */
 	sc->sc_vnode = NULL;
 
 	sc->sc_flags = 0;
