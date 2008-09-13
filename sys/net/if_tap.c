@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_tap.c,v 1.49 2008/11/03 00:52:07 hans Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/types.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/conf.h>
@@ -51,7 +52,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_tap.c,v 1.49 2008/11/03 00:52:07 hans Exp $");
 #include <sys/poll.h>
 #include <sys/select.h>
 #include <sys/sockio.h>
+#include <sys/stat.h>
 #include <sys/sysctl.h>
+#include <sys/vnode.h>
 #include <sys/kauth.h>
 #include <sys/mutex.h>
 #include <sys/simplelock.h>
@@ -108,6 +111,7 @@ struct tap_softc {
 	kmutex_t	sc_rdlock;
 	struct simplelock	sc_kqlock;
 	void		*sc_sih;
+	struct vnode	*sc_vnode;
 };
 
 /* autoconf(9) glue */
@@ -138,6 +142,7 @@ static int	tap_fops_write(file_t *, off_t *, struct uio *,
     kauth_cred_t, int);
 static int	tap_fops_ioctl(file_t *, u_long, void *);
 static int	tap_fops_poll(file_t *, int);
+static int	tap_fops_stat(file_t *, struct stat *);
 static int	tap_fops_kqfilter(file_t *, struct knote *);
 
 static const struct fileops tap_fileops = {
@@ -146,13 +151,13 @@ static const struct fileops tap_fileops = {
 	tap_fops_ioctl,
 	fnullop_fcntl,
 	tap_fops_poll,
-	fbadop_stat,
+	tap_fops_stat,
 	tap_fops_close,
 	tap_fops_kqfilter,
 };
 
 /* Helper for cloning open() */
-static int	tap_dev_cloner(void);
+static int	tap_dev_cloner(struct vnode *);
 
 /* Character device routines */
 static int	tap_cdev_open(dev_t, int, int, struct lwp *);
@@ -309,6 +314,15 @@ tap_attach(device_t parent, device_t self, void *aux)
 	 * being common to all network interface drivers. */
 	if_attach(ifp);
 	ether_ifattach(ifp, enaddr);
+
+	/* Initialize the vnode pointer to NULL by default.
+	 *
+	 * This field will be unused if the interface was created by
+	 * ifconfig(8) and accessed later through /dev/tapN. However, if the
+	 * interface was created using the cloner device node, we will keep
+	 * track of the vnode structure of this node, use it during the
+	 * fo_stat() call and override just enough to point to the real node */
+	sc->sc_vnode = NULL;
 
 	sc->sc_flags = 0;
 
@@ -691,7 +705,12 @@ tap_cdev_open(dev_t dev, int flags, int fmt, struct lwp *l)
 	struct tap_softc *sc;
 
 	if (minor(dev) == TAP_CLONER) {
-		return tap_dev_cloner();
+		struct vnode *vp;
+
+		vp = NULL;
+		vfinddev(dev, VCHR, &vp);
+
+		return tap_dev_cloner(vp);
 	}
 
 	sc = device_lookup_private(&tap_cd, minor(dev));
@@ -728,7 +747,7 @@ tap_cdev_open(dev_t dev, int flags, int fmt, struct lwp *l)
  */
 
 static int
-tap_dev_cloner()
+tap_dev_cloner(struct vnode *vp)
 {
 	struct tap_softc *sc;
 	file_t *fp;
@@ -743,6 +762,8 @@ tap_dev_cloner()
 	}
 
 	sc->sc_flags |= TAP_INUSE;
+	sc->sc_vnode = vp;
+	vhold(vp);
 
 	return fd_clone(fp, fd, FREAD|FWRITE, &tap_fileops, sc);
 }
@@ -774,27 +795,27 @@ tap_cdev_close(dev_t dev, int flags, int fmt, struct lwp *l)
 static int
 tap_fops_close(file_t *fp)
 {
-	struct tap_softc *sc;
+	struct tap_softc *sc = fp->f_data;
 	int error;
 
-	sc = fp->f_data;
+	error = 0;
 
 	/* tap_dev_close currently always succeeds, but it might not
 	 * always be the case. */
 	KERNEL_LOCK(1, NULL);
-	if ((error = tap_dev_close(sc)) != 0) {
-		KERNEL_UNLOCK_ONE(NULL);
-		return (error);
-	}
+	error = tap_dev_close(sc);
+	if (error != 0)
+		goto bail_out;
+
+	if (sc->sc_vnode != NULL)
+		holdrele(sc->sc_vnode);
 
 	/* Destroy the device now that it is no longer useful,
-	 * unless it's already being destroyed. */
-	if ((sc->sc_flags & TAP_GOING) != 0) {
-		KERNEL_UNLOCK_ONE(NULL);
-		return (0);
-	}
+	 * if it's not being destroyed. */
+	if ((sc->sc_flags & TAP_GOING) == 0)
+		error = tap_clone_destroyer(sc);
 
-	error = tap_clone_destroyer(sc);
+bail_out:
 	KERNEL_UNLOCK_ONE(NULL);
 	return error;
 }
@@ -1133,6 +1154,21 @@ tap_dev_poll(struct tap_softc *sc, int events, struct lwp *l)
 	revents |= events & (POLLOUT|POLLWRNORM);
 
 	return (revents);
+}
+
+static int
+tap_fops_stat(file_t *fp, struct stat *st)
+{
+	struct tap_softc *sc = fp->f_data;
+	int error;
+
+	error = vn_stat(sc->sc_vnode, st);
+	if (error != 0)
+		return error;
+
+	st->st_rdev = makedev(TAP_CDEV_MAJOR, device_unit(sc->sc_dev));
+
+	return 0;
 }
 
 static struct filterops tap_read_filterops =
