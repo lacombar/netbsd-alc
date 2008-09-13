@@ -801,6 +801,8 @@ tap_fops_close(file_t *fp)
 	struct tap_softc *sc = fp->f_data;
 	int error;
 
+	KASSERT(sc->sc_vnode != NULL);
+
 	error = 0;
 
 	/* tap_dev_close currently always succeeds, but it might not
@@ -810,8 +812,8 @@ tap_fops_close(file_t *fp)
 	if (error != 0)
 		goto bail_out;
 
-	if (sc->sc_vnode != NULL)
-		holdrele(sc->sc_vnode);
+	/* Release the reference to the cloner device we still hold */
+	holdrele(sc->sc_vnode);
 
 	/* Destroy the device now that it is no longer useful,
 	 * if it's not being destroyed. */
