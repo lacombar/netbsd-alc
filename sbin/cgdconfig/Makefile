@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.8 2008/02/16 17:56:36 matt Exp $
+# $NetBSD: Makefile,v 1.10 2008/07/24 05:32:45 dholland Exp $
 
 PROG=	cgdconfig
 MAN=	cgdconfig.8
@@ -18,7 +18,3 @@ DPADD=  ${LIBUTIL} ${LIBCRYPTO} ${LIBCRYPT} ${LIBY} ${LIBL}
 LDADD=  -lutil -lcrypto -lcrypt -ly -ll
 
 .include <bsd.prog.mk>
-
-.if ${HAVE_GCC} == 4
-COPTS.cgdconfig.c+=	-Wno-pointer-sign
-.endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: vfs_subr.c,v 1.353 2008/07/16 20:06:19 pooka Exp $	*/
+/*	$NetBSD: vfs_subr.c,v 1.357 2008/09/24 09:33:40 ad Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2004, 2005, 2007, 2008 The NetBSD Foundation, Inc.
@@ -81,7 +81,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: vfs_subr.c,v 1.353 2008/07/16 20:06:19 pooka Exp $");
+__KERNEL_RCSID(0, "$NetBSD: vfs_subr.c,v 1.357 2008/09/24 09:33:40 ad Exp $");
 
 #include "opt_ddb.h"
 #include "opt_compat_netbsd.h"
@@ -106,6 +106,7 @@ __KERNEL_RCSID(0, "$NetBSD: vfs_subr.c,v 1.353 2008/07/16 20:06:19 pooka Exp $")
 #include <sys/kauth.h>
 #include <sys/atomic.h>
 #include <sys/kthread.h>
+#include <sys/wapbl.h>
 
 #include <miscfs/specfs/specdev.h>
 #include <miscfs/syncfs/syncfs.h>
@@ -160,7 +161,6 @@ kmutex_t mountlist_lock;
 kmutex_t mntid_lock;
 kmutex_t mntvnode_lock;
 kmutex_t vnode_free_list_lock;
-kmutex_t specfs_lock;
 kmutex_t vfs_list_lock;
 
 static pool_cache_t vnode_cache;
@@ -282,7 +282,7 @@ void
 vfs_destroy(struct mount *mp)
 {
 
-	if (__predict_true(atomic_dec_uint_nv(&mp->mnt_refcnt) > 0)) {
+	if (__predict_true((int)atomic_dec_uint_nv(&mp->mnt_refcnt) > 0)) {
 		return;
 	}
 
@@ -290,6 +290,7 @@ vfs_destroy(struct mount *mp)
 	 * Nothing else has visibility of the mount: we can now
 	 * free the data structures.
 	 */
+	KASSERT(mp->mnt_refcnt == 0);
 	specificdata_fini(mount_specificdata_domain, &mp->mnt_specdataref);
 	rw_destroy(&mp->mnt_unmounting);
 	mutex_destroy(&mp->mnt_updating);
@@ -1804,8 +1805,13 @@ vclean(vnode_t *vp, int flags)
 	 */
 	if (flags & DOCLOSE) {
 		error = vinvalbuf(vp, V_SAVE, NOCRED, l, 0, 0);
-		if (error != 0)
+		if (error != 0) {
+			/* XXX, fix vn_start_write's grab of mp and use that. */
+
+			if (wapbl_vphaswapbl(vp))
+				WAPBL_DISCARD(wapbl_vptomp(vp));
 			error = vinvalbuf(vp, 0, NOCRED, l, 0, 0);
+		}
 		KASSERT(error == 0);
 		KASSERT((vp->v_iflag & VI_ONWORKLST) == 0);
 		if (active && (vp->v_type == VBLK || vp->v_type == VCHR)) {
@@ -2056,9 +2062,9 @@ sysctl_vfs_generic_fstypes(SYSCTLFN_ARGS)
 			slen = strlen(bf);
 			if (left < slen + 1)
 				break;
-			/* +1 to copy out the trailing NUL byte */
 			v->vfs_refcount++;
 			mutex_exit(&vfs_list_lock);
+			/* +1 to copy out the trailing NUL byte */
 			error = copyout(bf, where, slen + 1);
 			mutex_enter(&vfs_list_lock);
 			v->vfs_refcount--;

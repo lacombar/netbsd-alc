@@ -1,9 +1,10 @@
-#	$NetBSD: files.i2c,v 1.16 2007/09/02 01:40:46 macallan Exp $
+#	$NetBSD: files.i2c,v 1.19 2008/10/02 00:47:51 pgoyette Exp $
 
+defflag	opt_i2cbus.h				I2C_SCAN
 define	i2cbus { }
 define	i2cexec
 
-device	iic { addr, [size = -1] }
+device	iic { [addr = -1], [size = -1] }
 attach	iic at i2cbus
 file	dev/i2c/i2c.c				iic | i2cbus
 file	dev/i2c/i2c_exec.c			iic | i2cbus | i2cexec
@@ -69,6 +70,12 @@ define adt7467c {}
 device adt7467c: sysmon_envsys
 attach adt7467c at iic
 file dev/i2c/adt7467.c			adt7467c
+
+# Analog Devices dBCool family of thermal monitors / fan controllers
+define dbcool {}
+device dbcool: sysmon_envsys
+attach dbcool at iic
+file dev/i2c/dbcool.c			dbcool
 
 # Analog Devices ADM 1030 thermal monitor / fan controller
 define adm1030c {}

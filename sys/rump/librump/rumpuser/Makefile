@@ -1,13 +1,17 @@
-#	$NetBSD: Makefile,v 1.7 2008/05/29 13:12:29 pooka Exp $
+#	$NetBSD: Makefile,v 1.10 2008/09/27 20:49:55 pooka Exp $
 #
 
-.include <bsd.own.mk>
-
 LIB=		rumpuser
+INCS=		rumpuser.h
+INCSDIR=	/usr/include/rump
+WARNS=		4
 
 SRCS=		rumpuser.c rumpuser_pth.c
 
-RUMPKERNEL=	no
+LDFLAGS+=	-Wl,--wrap=malloc
 
-.include "${NETBSDSRCDIR}/sys/rump/Makefile.rump"
+# no shlib_version because this is automatically in sync with lib/librumpuser
+SHLIB_MAJOR=	0
+SHLIB_MINOR=	0
+
 .include <bsd.lib.mk>

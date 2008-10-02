@@ -1,7 +1,7 @@
-/*	$NetBSD: ps.c,v 1.68 2008/05/26 14:21:08 christos Exp $	*/
+/*	$NetBSD: ps.c,v 1.71 2008/09/26 13:02:42 wiz Exp $	*/
 
 /*
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000-2008 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -60,15 +60,15 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__COPYRIGHT("@(#) Copyright (c) 1990, 1993, 1994\n\
-	The Regents of the University of California.  All rights reserved.\n");
+__COPYRIGHT("@(#) Copyright (c) 1990, 1993, 1994\
+ The Regents of the University of California.  All rights reserved.");
 #endif /* not lint */
 
 #ifndef lint
 #if 0
 static char sccsid[] = "@(#)ps.c	8.4 (Berkeley) 4/2/94";
 #else
-__RCSID("$NetBSD: ps.c,v 1.68 2008/05/26 14:21:08 christos Exp $");
+__RCSID("$NetBSD: ps.c,v 1.71 2008/09/26 13:02:42 wiz Exp $");
 #endif
 #endif /* not lint */
 
@@ -104,7 +104,7 @@ __RCSID("$NetBSD: ps.c,v 1.68 2008/05/26 14:21:08 christos Exp $");
  * ARGOPTS must contain all option characters that take arguments
  * (except for 't'!) - it is used in kludge_oldps_options()
  */
-#define	GETOPTSTR	"acCeghjk:LlM:mN:O:o:p:rSsTt:U:uvW:wx"
+#define	GETOPTSTR	"aAcCeghjk:LlM:mN:O:o:p:rSsTt:U:uvW:wx"
 #define	ARGOPTS		"kMNOopUW"
 
 struct kinfo_proc2 *kinfo;
@@ -180,6 +180,10 @@ main(int argc, char *argv[])
 	mode = PRINTMODE;
 	while ((ch = getopt(argc, argv, GETOPTSTR)) != -1)
 		switch((char)ch) {
+		case 'A':
+			/* "-A" shows all processes, like "-ax" */
+			xflg = 1;
+			/*FALLTHROUGH*/
 		case 'a':
 			what = KERN_PROC_ALL;
 			flag = 0;
@@ -757,9 +761,9 @@ usage(void)
 
 	(void)fprintf(stderr,
 	    "usage:\t%s\n\t   %s\n\t%s\n",
-	    "ps [-acCehjlmrsSTuvwx] [-k key] [-O|o fmt] [-p pid] [-t tty]",
-	    "[-M core] [-N system] [-W swap] [-U username]",
-	    "ps [-L]");
+	    "ps [-AaCcehjlmrSsTuvwx] [-k key] [-M core] [-N system] [-O fmt]",
+	    "[-o fmt] [-p pid] [-t tty] [-U username] [-W swap]",
+	    "ps -L");
 	exit(1);
 	/* NOTREACHED */
 }

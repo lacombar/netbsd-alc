@@ -1,4 +1,4 @@
-/*	$NetBSD: tty.c,v 1.225 2008/06/16 09:51:14 ad Exp $	*/
+/*	$NetBSD: tty.c,v 1.227 2008/08/08 07:18:03 uebayasi Exp $	*/
 
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
@@ -63,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tty.c,v 1.225 2008/06/16 09:51:14 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tty.c,v 1.227 2008/08/08 07:18:03 uebayasi Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1914,12 +1914,10 @@ ttwrite(struct tty *tp, struct uio *uio, int flag)
 	u_char		*cp;
 	struct proc	*p;
 	int		cc, ce, i, hiwat, error;
-	size_t		cnt;
 	u_char		obuf[OBUFSIZ];
 
 	cp = NULL;
 	hiwat = tp->t_hiwat;
-	cnt = uio->uio_resid;
 	error = 0;
 	cc = 0;
  loop:
@@ -2639,8 +2637,8 @@ ttymalloc(void)
 	cv_init(&tp->t_cancvf, "ttycanf");
 	/* output queue doesn't need quoting */
 	clalloc(&tp->t_outq, 1024, 0);
-	cv_init(&tp->t_outcv, "ttycan");
-	cv_init(&tp->t_outcvf, "ttycanf");
+	cv_init(&tp->t_outcv, "ttyout");
+	cv_init(&tp->t_outcvf, "ttyoutf");
 	/* Set default line discipline. */
 	tp->t_linesw = ttyldisc_default();
 	selinit(&tp->t_rsel);

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.4 2006/05/11 23:16:29 mrg Exp $
+#	$NetBSD: Makefile,v 1.6 2008/07/24 05:21:12 dholland Exp $
 
 SRCS=	atactl.c
 
@@ -9,7 +9,3 @@ LDADD+=-lutil
 DPADD+=${LIBUTIL}
 
 .include <bsd.prog.mk>
-
-.if ${HAVE_GCC} == 4
-COPTS+=	-Wno-pointer-sign
-.endif

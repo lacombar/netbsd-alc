@@ -1,4 +1,4 @@
-/*	$NetBSD: acpi.c,v 1.118 2008/07/15 16:15:28 dyoung Exp $	*/
+/*	$NetBSD: acpi.c,v 1.120 2008/09/19 11:19:33 jmcneill Exp $	*/
 
 /*-
  * Copyright (c) 2003, 2007 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi.c,v 1.118 2008/07/15 16:15:28 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi.c,v 1.120 2008/09/19 11:19:33 jmcneill Exp $");
 
 #include "opt_acpi.h"
 #include "opt_pcifixup.h"
