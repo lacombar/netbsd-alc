@@ -52,24 +52,25 @@ __KERNEL_RCSID(0, "$NetBSD: rijndael-api-fst.c,v 1.21 2007/01/22 01:38:33 cbiere
 #include <crypto/rijndael/rijndael-alg-fst.h>
 #include <crypto/rijndael/rijndael-api-fst.h>
 
-int rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen, const char *keyMaterial) {
+int
+rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen, const char *keyMaterial)
+{
 	u_int8_t cipherKey[RIJNDAEL_MAXKB];
 
 	if (key == NULL) {
 		return BAD_KEY_INSTANCE;
 	}
 
-	if ((direction == DIR_ENCRYPT) || (direction == DIR_DECRYPT)) {
-		key->direction = direction;
-	} else {
+	if (direction != DIR_ENCRYPT && direction != DIR_DECRYPT) {
 		return BAD_KEY_DIR;
 	}
 
-	if ((keyLen == 128) || (keyLen == 192) || (keyLen == 256)) {
-		key->keyLen = keyLen;
-	} else {
+	if (keyLen != 128 && keyLen != 192 && keyLen != 256) {
 		return BAD_KEY_MAT;
 	}
+
+	key->direction = direction;
+	key->keyLen = keyLen;
 
 	if (keyMaterial != NULL) {
 		memcpy(key->keyMaterial, keyMaterial, keyLen/8);
@@ -86,12 +87,15 @@ int rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen, const char *k
 	return TRUE;
 }
 
-int rijndael_cipherInit(cipherInstance *cipher, BYTE mode, const char *IV) {
-	if ((mode == MODE_ECB) || (mode == MODE_CBC) || (mode == MODE_CFB1)) {
-		cipher->mode = mode;
-	} else {
+int
+rijndael_cipherInit(cipherInstance *cipher, BYTE mode, const char *IV)
+{
+
+	if (mode != MODE_ECB && mode != MODE_CBC && mode != MODE_CFB1)
 		return BAD_CIPHER_MODE;
-	}
+	
+	cipher->mode = mode;
+
 	if (IV != NULL) {
 		memcpy(cipher->IV, IV, RIJNDAEL_MAX_IV_SIZE);
 	} else {
@@ -100,16 +104,17 @@ int rijndael_cipherInit(cipherInstance *cipher, BYTE mode, const char *IV) {
 	return TRUE;
 }
 
-int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
-		const BYTE *input, int inputLen, BYTE *outBuffer) {
+int
+rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
+    const BYTE *input, int inputLen, BYTE *outBuffer)
+{
 	int i, k, t, numBlocks;
 	u_int8_t block[16], *iv;
 
-	if (cipher == NULL ||
-		key == NULL ||
-		key->direction == DIR_DECRYPT) {
+	if (cipher == NULL || key == NULL || key->direction == DIR_DECRYPT) {
 		return BAD_CIPHER_STATE;
 	}
+
 	if (input == NULL || inputLen <= 0) {
 		return 0; /* nothing to do */
 	}
@@ -144,28 +149,31 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		}
 		break;
 
-    case MODE_CFB1:
+	case MODE_CFB1:
 		iv = (u_int8_t *)cipher->IV;
-        for (i = numBlocks; i > 0; i--) {
+		for (i = numBlocks; i > 0; i--) {
 			memcpy(outBuffer, input, 16);
-            for (k = 0; k < 128; k++) {
+
+			for (k = 0; k < 128; k++) {
 				rijndaelEncrypt(key->ek, key->Nr, iv, block);
-                outBuffer[k >> 3] ^= (block[0] & 0x80U) >> (k & 7);
-                for (t = 0; t < 15; t++) {
-                	iv[t] = (iv[t] << 1) | (iv[t + 1] >> 7);
-                }
-               	iv[15] = (iv[15] << 1) | ((outBuffer[k >> 3] >> (7 - (k & 7))) & 1);
-            }
-            outBuffer += 16;
-            input += 16;
-        }
+
+        	        	outBuffer[k >> 3] ^= (block[0] & 0x80U) >> (k & 7);
+	        	        for (t = 0; t < 15; t++) {
+                			iv[t] = (iv[t] << 1) | (iv[t + 1] >> 7);
+                		}
+		               	iv[15] = (iv[15] << 1) |
+				    ((outBuffer[k >> 3] >> (7 - (k & 7))) & 1);
+			}
+			outBuffer += 16;
+			input += 16;
+		}
         break;
 
 	default:
 		return BAD_CIPHER_STATE;
 	}
 
-	return 128*numBlocks;
+	return inputLen;
 }
 
 /**
@@ -177,8 +185,10 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
  *
  * @return	length in octets (not bits) of the encrypted output buffer.
  */
-int rijndael_padEncrypt(cipherInstance *cipher, keyInstance *key,
-		const BYTE *input, int inputOctets, BYTE *outBuffer) {
+int
+rijndael_padEncrypt(cipherInstance *cipher, keyInstance *key,
+    const BYTE *input, int inputOctets, BYTE *outBuffer)
+{
 	int i, numBlocks, padLen;
 	u_int8_t block[16], *iv;
 
@@ -187,6 +197,7 @@ int rijndael_padEncrypt(cipherInstance *cipher, keyInstance *key,
 		key->direction == DIR_DECRYPT) {
 		return BAD_CIPHER_STATE;
 	}
+
 	if (input == NULL || inputOctets <= 0) {
 		return 0; /* nothing to do */
 	}
@@ -240,13 +251,14 @@ int rijndael_padEncrypt(cipherInstance *cipher, keyInstance *key,
 	return 16*(numBlocks + 1);
 }
 
-int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
-		const BYTE *input, int inputLen, BYTE *outBuffer) {
+int
+rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
+    const BYTE *input, int inputLen, BYTE *outBuffer)
+{
 	int i, k, t, numBlocks;
 	u_int8_t block[16], *iv;
 
-	if (cipher == NULL ||
-		key == NULL ||
+	if (cipher == NULL || key == NULL ||
 		(cipher->mode != MODE_CFB1 && key->direction == DIR_ENCRYPT)) {
 		return BAD_CIPHER_STATE;
 	}
@@ -280,46 +292,49 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 		}
 		break;
 
-    case MODE_CFB1:
+	case MODE_CFB1:
 		iv = (u_int8_t *)cipher->IV;
-        for (i = numBlocks; i > 0; i--) {
+		for (i = numBlocks; i > 0; i--) {
 			memcpy(outBuffer, input, 16);
-            for (k = 0; k < 128; k++) {
+			for (k = 0; k < 128; k++) {
 				rijndaelEncrypt(key->ek, key->Nr, iv, block);
-                for (t = 0; t < 15; t++) {
-                	iv[t] = (iv[t] << 1) | (iv[t + 1] >> 7);
-                }
-               	iv[15] = (iv[15] << 1) | ((input[k >> 3] >> (7 - (k & 7))) & 1);
-                outBuffer[k >> 3] ^= (block[0] & 0x80U) >> (k & 7);
-            }
-            outBuffer += 16;
-            input += 16;
-        }
-        break;
+				for (t = 0; t < 15; t++) {
+					iv[t] = (iv[t] << 1) | (iv[t + 1] >> 7);
+				}
+				iv[15] = (iv[15] << 1) | 
+				    ((input[k >> 3] >> (7 - (k & 7))) & 1);
+				outBuffer[k >> 3] ^=
+				    (block[0] & 0x80U) >> (k & 7);
+			}
+			outBuffer += 16;
+			input += 16;
+		}
+		break;
 
 	default:
 		return BAD_CIPHER_STATE;
 	}
 
-	return 128*numBlocks;
+	return inputLen;
 }
 
-int rijndael_padDecrypt(cipherInstance *cipher, keyInstance *key,
-		const BYTE *input, int inputOctets, BYTE *outBuffer) {
+int
+rijndael_padDecrypt(cipherInstance *cipher, keyInstance *key,
+    const BYTE *input, int inputOctets, BYTE *outBuffer)
+{
 	int i, numBlocks, padLen;
 	u_int8_t block[16];
 
-	if (cipher == NULL ||
-		key == NULL ||
+	if (cipher == NULL || key == NULL ||
 		key->direction == DIR_ENCRYPT) {
 		return BAD_CIPHER_STATE;
 	}
-	if (input == NULL || inputOctets <= 0) {
+
+	if (input == NULL || inputOctets <= 0)
 		return 0; /* nothing to do */
-	}
-	if (inputOctets % 16 != 0) {
+
+	if (inputOctets % 16 != 0)
 		return BAD_DATA;
-	}
 
 	numBlocks = inputOctets/16;
 
