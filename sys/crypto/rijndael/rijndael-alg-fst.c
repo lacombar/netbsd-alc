@@ -119,6 +119,7 @@ static const u32 Te0[256] = {
 	0x824141c3U, 0x299999b0U, 0x5a2d2d77U, 0x1e0f0f11U,
 	0x7bb0b0cbU, 0xa85454fcU, 0x6dbbbbd6U, 0x2c16163aU,
 };
+#ifndef AES_SMALL_DATA
 static const u32 Te1[256] = {
 	0xa5c66363U, 0x84f87c7cU, 0x99ee7777U, 0x8df67b7bU,
 	0x0dfff2f2U, 0xbdd66b6bU, 0xb1de6f6fU, 0x5491c5c5U,
@@ -318,6 +319,7 @@ static const u32 Te3[256] = {
 	0x4141c382U, 0x9999b029U, 0x2d2d775aU, 0x0f0f111eU,
 	0xb0b0cb7bU, 0x5454fca8U, 0xbbbbd66dU, 0x16163a2cU,
 };
+#endif /* AES_SMALL_DATA */
 static const u32 Te4[256] = {
 	0x63636363U, 0x7c7c7c7cU, 0x77777777U, 0x7b7b7b7bU,
 	0xf2f2f2f2U, 0x6b6b6b6bU, 0x6f6f6f6fU, 0xc5c5c5c5U,
@@ -450,6 +452,7 @@ static const u32 Td0[256] = {
 	0x39a80171U, 0x080cb3deU, 0xd8b4e49cU, 0x6456c190U,
 	0x7bcb8461U, 0xd532b670U, 0x486c5c74U, 0xd0b85742U,
 };
+#ifndef AES_SMALL_DATA
 static const u32 Td1[256] = {
 	0x5051f4a7U, 0x537e4165U, 0xc31a17a4U, 0x963a275eU,
 	0xcb3bab6bU, 0xf11f9d45U, 0xabacfa58U, 0x934be303U,
@@ -649,6 +652,7 @@ static const u32 Td3[256] = {
 	0xa8017139U, 0x0cb3de08U, 0xb4e49cd8U, 0x56c19064U,
 	0xcb84617bU, 0x32b670d5U, 0x6c5c7448U, 0xb85742d0U,
 };
+#endif /* AES_SMALL_DATA */
 static const u32 Td4[256] = {
 	0x52525252U, 0x09090909U, 0x6a6a6a6aU, 0xd5d5d5d5U,
 	0x30303030U, 0x36363636U, 0xa5a5a5a5U, 0x38383838U,
@@ -723,29 +727,55 @@ static const u32 rcon[] = {
 
 #define SWAP(x) (_lrotl(x, 8) & 0x00ff00ff | _lrotr(x, 8) & 0xff00ff00)
 
+#ifndef AES_SMALL_DATA
+#define TE0(x)			Te0[(x)]
+#define TE1(x)			Te1[(x)]
+#define TE2(x)			Te2[(x)]
+#define TE3(x)			Te3[(x)]
+
+#define TD0(x)			Td0[(x)]
+#define TD1(x)			Td1[(x)]
+#define TD2(x)			Td2[(x)]
+#define TD3(x)			Td3[(x)]
+#else
+#define AES_ROR_8(x)	((((x) >> 8 ) & 0xffffff) | (((x) << 24) & 0xff000000))
+#define AES_ROR_16(x)	((((x) >> 16) & 0xffff)   | (((x) << 16) & 0xffff0000))
+#define AES_ROR_24(x)	((((x) >> 24) & 0xff)     | (((x) << 8)  & 0xffffff00))
+
+#define TE0(x)			Te0[(x)]
+#define TE1(x)			AES_ROR_8(Te0[(x)])
+#define TE2(x)			AES_ROR_16(Te0[(x)])
+#define TE3(x)			AES_ROR_24(Te0[(x)])
+
+#define TD0(x)			Td0[(x)]
+#define TD1(x)			AES_ROR_8(Td0[(x)])
+#define TD2(x)			AES_ROR_16(Td0[(x)])
+#define TD3(x)			AES_ROR_24(Td0[(x)])
+#endif
+
 #define RIJNDAEL_ROUND_ENC(res, p0, p1, p2, p3, _rk) \
 do { \
-	res = Te0[ p0 >> 24        ] ^ \
-	      Te1[(p1 >> 16) & 0xff] ^ \
-	      Te2[(p2 >>  8) & 0xff] ^ \
-	      Te3[ p3        & 0xff] ^ rk[_rk]; \
+	res = TE0( p0 >> 24        ) ^ \
+	      TE1((p1 >> 16) & 0xff) ^ \
+	      TE2((p2 >>  8) & 0xff) ^ \
+	      TE3( p3        & 0xff) ^ rk[_rk]; \
 } while (/*CONSTCOND*/ 0)
 
 #define RIJNDAEL_ROUND_DEC(res, p0, p1, p2, p3, _rk) \
 do { \
-	res = Td0[ p0 >> 24        ] ^ \
-	      Td1[(p1 >> 16) & 0xff] ^ \
-	      Td2[(p2 >>  8) & 0xff] ^ \
-	      Td3[ p3        & 0xff] ^ rk[_rk]; \
+	res = TD0( p0 >> 24        ) ^ \
+	      TD1((p1 >> 16) & 0xff) ^ \
+	      TD2((p2 >>  8) & 0xff) ^ \
+	      TD3( p3        & 0xff) ^ rk[_rk]; \
 } while (/*CONSTCOND*/ 0)
 
 #define RIJNDAEL_iMixColumn(_rk, idx) \
 do { \
 	_rk[idx] = \
-	    Td0[Te4[(_rk[idx] >> 24)       ] & 0xff] ^ \
-	    Td1[Te4[(_rk[idx] >> 16) & 0xff] & 0xff] ^ \
-	    Td2[Te4[(_rk[idx] >>  8) & 0xff] & 0xff] ^ \
-	    Td3[Te4[(_rk[idx])       & 0xff] & 0xff]; \
+	    TD0[Te4[(_rk[idx] >> 24)       ] & 0xff] ^ \
+	    TD1[Te4[(_rk[idx] >> 16) & 0xff] & 0xff] ^ \
+	    TD2[Te4[(_rk[idx] >>  8) & 0xff] & 0xff] ^ \
+	    TD3[Te4[(_rk[idx])       & 0xff] & 0xff]; \
 } while (/*CONSTCOND*/ 0)
 
 #ifdef _MSC_VER
