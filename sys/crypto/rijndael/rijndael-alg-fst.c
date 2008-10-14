@@ -761,6 +761,15 @@ do { \
 	      TE3( p3        & 0xff) ^ rk[_rk]; \
 } while (/*CONSTCOND*/ 0)
 
+#define RIJNDAEL_FINAL_ROUND(res, p0, p1, p2, p3, _rk) \
+do { \
+   	res = \
+   	    (Td4[(p0 >> 24)       ] & 0xff000000) ^ \
+   	    (Td4[(p1 >> 16) & 0xff] & 0x00ff0000) ^ \
+   	    (Td4[(p2 >>  8) & 0xff] & 0x0000ff00) ^ \
+   	    (Td4[(p3      ) & 0xff] & 0x000000ff) ^ rk[_rk]; \
+} while (/*CONSTCOND*/ 0)
+
 #define RIJNDAEL_ROUND_DEC(res, p0, p1, p2, p3, _rk) \
 do { \
 	res = TD0( p0 >> 24        ) ^ \
@@ -1165,32 +1174,12 @@ void rijndaelDecrypt(const u32 rk[/*4*(Nr + 1)*/], int Nr, const u8 ct[16], u8 p
 	 * apply last round and
 	 * map cipher state to byte array block:
 	 */
-   	s0 =
-   	    (Td4[(t0 >> 24)       ] & 0xff000000) ^
-   	    (Td4[(t3 >> 16) & 0xff] & 0x00ff0000) ^
-   	    (Td4[(t2 >>  8) & 0xff] & 0x0000ff00) ^
-   	    (Td4[(t1      ) & 0xff] & 0x000000ff) ^
-   	    rk[0];
+	RIJNDAEL_FINAL_ROUND(s0, t0, t3, t2, t1, 0);
 	PUTU32(pt     , s0);
-   	s1 =
-   	    (Td4[(t1 >> 24)       ] & 0xff000000) ^
-   	    (Td4[(t0 >> 16) & 0xff] & 0x00ff0000) ^
-   	    (Td4[(t3 >>  8) & 0xff] & 0x0000ff00) ^
-   	    (Td4[(t2      ) & 0xff] & 0x000000ff) ^
-   	    rk[1];
+	RIJNDAEL_FINAL_ROUND(s1, t1, t0, t3, t2, 0);
 	PUTU32(pt +  4, s1);
-   	s2 =
-   	    (Td4[(t2 >> 24)       ] & 0xff000000) ^
-   	    (Td4[(t1 >> 16) & 0xff] & 0x00ff0000) ^
-   	    (Td4[(t0 >>  8) & 0xff] & 0x0000ff00) ^
-   	    (Td4[(t3      ) & 0xff] & 0x000000ff) ^
-   	    rk[2];
+	RIJNDAEL_FINAL_ROUND(s2, t2, t1, t0, t3, 0);
 	PUTU32(pt +  8, s2);
-   	s3 =
-   	    (Td4[(t3 >> 24)       ] & 0xff000000) ^
-   	    (Td4[(t2 >> 16) & 0xff] & 0x00ff0000) ^
-   	    (Td4[(t1 >>  8) & 0xff] & 0x0000ff00) ^
-   	    (Td4[(t0      ) & 0xff] & 0x000000ff) ^
-   	    rk[3];
+	RIJNDAEL_FINAL_ROUND(s3, t3, t2, t1, t0, 0);
 	PUTU32(pt + 12, s3);
 }
