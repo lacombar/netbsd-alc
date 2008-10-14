@@ -753,38 +753,37 @@ static const u32 rcon[] = {
 #define TD3(x)			AES_ROR_24(Td0[(x)])
 #endif
 
-#define RIJNDAEL_ROUND_ENC(res, p0, p1, p2, p3, _rk) \
-do { \
-	res = TE0( p0 >> 24        ) ^ \
-	      TE1((p1 >> 16) & 0xff) ^ \
-	      TE2((p2 >>  8) & 0xff) ^ \
-	      TE3( p3        & 0xff) ^ rk[_rk]; \
+#define RIJNDAEL_ROUND_ENC(res, p0, p1, p2, p3, _rk)		\
+do {								\
+	res = TE0((p0 >> 24)       ) ^				\
+	      TE1((p1 >> 16) & 0xff) ^				\
+	      TE2((p2 >>  8) & 0xff) ^				\
+	      TE3((p3      ) & 0xff) ^ rk[_rk];			\
 } while (/*CONSTCOND*/ 0)
 
-#define RIJNDAEL_FINAL_ROUND(res, p0, p1, p2, p3, _rk) \
-do { \
-   	res = \
-   	    (Td4[(p0 >> 24)       ] & 0xff000000) ^ \
-   	    (Td4[(p1 >> 16) & 0xff] & 0x00ff0000) ^ \
-   	    (Td4[(p2 >>  8) & 0xff] & 0x0000ff00) ^ \
-   	    (Td4[(p3      ) & 0xff] & 0x000000ff) ^ rk[_rk]; \
+#define RIJNDAEL_FINAL_ROUND(res, p0, p1, p2, p3, _rk)		\
+do {								\
+	res = (Td4[(p0 >> 24)       ] & 0xff000000) ^		\
+   	      (Td4[(p1 >> 16) & 0xff] & 0x00ff0000) ^		\
+   	      (Td4[(p2 >>  8) & 0xff] & 0x0000ff00) ^		\
+   	      (Td4[(p3      ) & 0xff] & 0x000000ff) ^ rk[_rk];	\
 } while (/*CONSTCOND*/ 0)
 
-#define RIJNDAEL_ROUND_DEC(res, p0, p1, p2, p3, _rk) \
-do { \
-	res = TD0( p0 >> 24        ) ^ \
-	      TD1((p1 >> 16) & 0xff) ^ \
-	      TD2((p2 >>  8) & 0xff) ^ \
-	      TD3( p3        & 0xff) ^ rk[_rk]; \
+#define RIJNDAEL_ROUND_DEC(res, p0, p1, p2, p3, _rk)		\
+do {								\
+	res = TD0((p0 >> 24)       ) ^				\
+	      TD1((p1 >> 16) & 0xff) ^				\
+	      TD2((p2 >>  8) & 0xff) ^ 				\
+	      TD3((p3      ) & 0xff) ^ rk[_rk]; 		\
 } while (/*CONSTCOND*/ 0)
 
-#define RIJNDAEL_iMixColumn(_rk, idx) \
-do { \
-	_rk[idx] = \
-	    TD0[Te4[(_rk[idx] >> 24)       ] & 0xff] ^ \
-	    TD1[Te4[(_rk[idx] >> 16) & 0xff] & 0xff] ^ \
-	    TD2[Te4[(_rk[idx] >>  8) & 0xff] & 0xff] ^ \
-	    TD3[Te4[(_rk[idx])       & 0xff] & 0xff]; \
+#define RIJNDAEL_iMixColumn(_rk, idx)				\
+do {								\
+	_rk[idx] =						\
+	    TD0[Te4[(_rk[idx] >> 24)       ] & 0xff] ^		\
+	    TD1[Te4[(_rk[idx] >> 16) & 0xff] & 0xff] ^		\
+	    TD2[Te4[(_rk[idx] >>  8) & 0xff] & 0xff] ^		\
+	    TD3[Te4[(_rk[idx])       & 0xff] & 0xff];		\
 } while (/*CONSTCOND*/ 0)
 
 #ifdef _MSC_VER
