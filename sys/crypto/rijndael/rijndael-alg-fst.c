@@ -910,10 +910,10 @@ int rijndaelKeySetupDec(u32 rk[/*4*(Nr + 1)*/], const u8 cipherKey[], int keyBit
 	/* apply the inverse MixColumn transform to all round keys but the first and the last: */
 	for (i = 1; i < Nr; i++) {
 		rk += 4;
-		RIJNDAEL_MIXCOLUMN_INV(rk, 0);
-		RIJNDAEL_MIXCOLUMN_INV(rk, 1);
-		RIJNDAEL_MIXCOLUMN_INV(rk, 2);
-		RIJNDAEL_MIXCOLUMN_INV(rk, 3);
+		RIJNDAEL_iMixColumn(rk, 0);
+		RIJNDAEL_iMixColumn(rk, 1);
+		RIJNDAEL_iMixColumn(rk, 2);
+		RIJNDAEL_iMixColumn(rk, 3);
 	}
 	return Nr;
 }
