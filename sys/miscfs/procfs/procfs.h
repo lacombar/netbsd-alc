@@ -108,6 +108,7 @@ typedef enum {
 	PFScpustat,	/* status info (if -o linux) */
 	PFSloadavg,	/* load average (if -o linux) */
 	PFSstatm,	/* process memory info (if -o linux) */
+	PFSswaps,	/* swap information (if -o linux) */
 #ifdef __HAVE_PROCFS_MACHDEP
 	PROCFS_MACHDEP_NODE_TYPES
 #endif
@@ -224,6 +225,8 @@ int procfs_douptime(struct lwp *, struct proc *, struct pfsnode *,
 int procfs_domounts(struct lwp *, struct proc *, struct pfsnode *,
     struct uio *);
 int procfs_doemul(struct lwp *, struct proc *, struct pfsnode *,
+    struct uio *);
+int procfs_doswaps(struct lwp *, struct proc *, struct pfsnode *pfs,
     struct uio *);
 
 void procfs_revoke_vnodes(struct proc *, void *);

@@ -53,6 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: procfs_linux.c,v 1.54 2008/05/31 21:34:42 ad Exp $")
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/conf.h>
+#include <sys/swap.h>
 
 #include <miscfs/procfs/procfs.h>
 #include <miscfs/specfs/specdev.h>
@@ -67,6 +68,7 @@ extern int max_devsw_convs;
 
 #define PGTOB(p)	((unsigned long)(p) << PAGE_SHIFT)
 #define PGTOKB(p)	((unsigned long)(p) << (PAGE_SHIFT - 10))
+#define	DBTOKB(p)	((unsigned int)(p) * DEV_BSIZE / 1024)
 
 #define LBFSZ (8 * 1024)
 
@@ -125,6 +127,75 @@ get_proc_size_info(struct lwp *l, unsigned long *stext, unsigned long *etext, un
 
 	vm_map_unlock_read(map);
 	uvmspace_free(vm);
+}
+
+/*
+ * Linux compatible /proc/swaps. Only active when the -o linux
+ * mountflag is used.
+ */
+
+int
+procfs_doswaps(struct lwp *curl, struct proc *p,
+    struct pfsnode *pfs, struct uio *uio)
+{
+	char *buf, *s;
+	int len, error, nswap;
+	size_t totallen, buflen;
+	register_t i, count;
+
+	struct swapent *sep0 = NULL;
+	const struct swapent *sep;
+
+	error = 0;
+	totallen = 0;
+	nswap = uvmexp.nswapdev;
+
+	buflen = LBFSZ;
+	buf = malloc(buflen, M_TEMP, M_WAITOK);
+
+	len = snprintf(buf, buflen,
+	    "Filename\t\t\t\tType\t\tSize\tUsed\tPriority\n");
+
+	if (len <= 0)
+		goto out;
+
+	buflen -= len;
+	totallen = len;
+	s = buf + len;
+
+	sep0 = malloc(sizeof(*sep0) * nswap, M_TEMP, M_WAITOK|M_ZERO);
+	sep = sep0;
+
+	uvm_swap_stats(SWAP_STATS, sep0, nswap, &count);
+
+	for (i = 0; i < count; i++, sep++) {
+		if (sep->se_flags == SWF_FAKE)
+			continue;
+
+		/* XXX Assume 512 bytes blocksize. Linux's /proc/swaps reports
+		 * size in kB. The blocksize information of the swap device is
+		 * available in `struct swapdev', but there is no API to access
+		 * it. swapctl(8) rely on getbsize(3) to get this value. */
+		len = snprintf(s, buflen, "%-39s %-15s %-7u %-7u %d\n",
+		    sep->se_path, (sep->se_dev == NODEV)? "file" : "partition",
+		    DBTOKB(sep->se_nblks),
+		    DBTOKB(sep->se_inuse),
+		    sep->se_priority);
+
+		if (len <= 0)
+			goto out;
+
+		buflen -= len;
+		totallen += len;
+		s += len;
+	}
+
+	error = uiomove_frombuf(buf, totallen, uio);
+out:
+	if (sep0 != NULL)
+		free(sep0, M_TEMP);
+	free(buf, M_TEMP);
+	return error;
 }
 
 /*

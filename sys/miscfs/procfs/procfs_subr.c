@@ -292,6 +292,7 @@ procfs_allocvp(mp, vpp, pid, pfs_type, fd, p)
 	case PFSmounts:	/* /proc/mounts = -r--r--r-- */
 	case PFSloadavg:	/* /proc/loadavg = -r--r--r-- */
 	case PFSstatm:	/* /proc/N/statm = -r--r--r-- */
+	case PFSswaps:	/* /proc/swaps = -r--r--r-- */
 		pfs->pfs_mode = S_IRUSR|S_IRGRP|S_IROTH;
 		vp->v_type = VREG;
 		break;
@@ -427,6 +428,9 @@ procfs_rw(v)
 	case PFScmdline:
 		error = procfs_docmdline(curl, p, pfs, uio);
 		break;
+
+	case PFSswaps:
+		return (procfs_doswaps(curl, p, pfs, uio));
 
 	case PFSmeminfo:
 		error = procfs_domeminfo(curl, p, pfs, uio);

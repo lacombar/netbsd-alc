@@ -195,7 +195,8 @@ static const struct proc_target proc_root_targets[] = {
 	{ DT_REG, N("mounts"),	    PFSmounts,	       procfs_validfile_linux },
 	{ DT_REG, N("devices"),     PFSdevices,        procfs_validfile_linux },
 	{ DT_REG, N("stat"),	    PFScpustat,        procfs_validfile_linux },
-	{ DT_REG, N("loadavg"),	    PFSloadavg,        procfs_validfile_linux },
+	{ DT_REG, N("loadavg"),     PFSloadavg,        procfs_validfile_linux },
+	{ DT_REG, N("swaps"),       PFSswaps,          procfs_validfile_linux }
 #undef N
 };
 static const int nproc_root_targets =
@@ -729,6 +730,7 @@ procfs_getattr(void *v)
 		vap->va_gid = kauth_cred_getegid(procp->p_cred);
 		break;
 	case PFSmeminfo:
+	case PFSswaps:
 	case PFSdevices:
 	case PFScpuinfo:
 	case PFSuptime:
@@ -837,6 +839,7 @@ procfs_getattr(void *v)
 	case PFSnotepg:
 	case PFScmdline:
 	case PFSmeminfo:
+	case PFSswaps:
 	case PFSdevices:
 	case PFScpuinfo:
 	case PFSuptime:
