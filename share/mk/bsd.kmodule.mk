@@ -1,4 +1,7 @@
-#	$NetBSD: bsd.kmodule.mk,v 1.11 2008/08/24 06:27:00 gmcgarry Exp $
+#	$NetBSD: bsd.kmodule.mk,v 1.14 2008/11/05 00:54:25 elad Exp $
+
+# We are not building this with PIE
+MKPIE=no
 
 .include <bsd.init.mk>
 .include <bsd.klinks.mk>
@@ -24,10 +27,10 @@ _YKMSRCS=	${SRCS:M*.[ly]:C/\..$/.c/} ${YHEADER:D${SRCS:M*.y:.y=.h}}
 DPSRCS+=	${_YKMSRCS}
 CLEANFILES+=	${_YKMSRCS}
 
-.if exists($S/../share/ldscripts/kmodule)
-KMODSCRIPT=	$S/../share/ldscripts/kmodule
+.if exists($S/../gnu/usr.bin/binutils/ld/xldscripts/kmodule)
+KMODSCRIPT=	$S/../gnu/usr.bin/binutils/ld/xldscripts/kmodule
 .else
-KMODSCRIPT=	${DESTDIR}/usr/share/ldscripts/kmodule
+KMODSCRIPT=	${DESTDIR}/usr/libdata/ldscripts/kmodule
 .endif
 
 OBJS+=		${SRCS:N*.h:N*.sh:R:S/$/.o/g}

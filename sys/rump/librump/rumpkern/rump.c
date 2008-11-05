@@ -1,4 +1,4 @@
-/*	$NetBSD: rump.c,v 1.60 2008/09/30 21:00:39 pooka Exp $	*/
+/*	$NetBSD: rump.c,v 1.72 2008/10/15 20:15:37 pooka Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -28,16 +28,22 @@
  */
 
 #include <sys/param.h>
+#include <sys/atomic.h>
+#include <sys/callout.h>
 #include <sys/cpu.h>
 #include <sys/filedesc.h>
+#include <sys/iostat.h>
 #include <sys/kauth.h>
 #include <sys/kmem.h>
 #include <sys/module.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
+#include <sys/once.h>
+#include <sys/percpu.h>
 #include <sys/queue.h>
 #include <sys/resourcevar.h>
 #include <sys/select.h>
+#include <sys/uidinfo.h>
 #include <sys/vnode.h>
 #include <sys/vfs_syscalls.h>
 #include <sys/wapbl.h>
@@ -48,6 +54,7 @@
 #include <rump/rumpuser.h>
 
 #include "rump_private.h"
+#include "rump_net_private.h"
 
 struct proc proc0;
 struct cwdinfo rump_cwdi;
@@ -88,12 +95,19 @@ rump_aiodone_worker(struct work *wk, void *dummy)
 static int rump_inited;
 static struct emul emul_rump;
 
-void
-rump_init()
+void __rump_net_unavailable(void);
+void __rump_net_unavailable() {}
+__weak_alias(rump_net_init,__rump_net_unavailable);
+
+void __rump_vfs_unavailable(void);
+void __rump_vfs_unavailable() {}
+__weak_alias(rump_vfs_init,__rump_vfs_unavailable);
+
+int
+_rump_init(int rump_version)
 {
 	extern char hostname[];
 	extern size_t hostnamelen;
-	extern kmutex_t rump_atomic_lock;
 	char buf[256];
 	struct proc *p;
 	struct lwp *l;
@@ -101,8 +115,14 @@ rump_init()
 
 	/* XXX */
 	if (rump_inited)
-		return;
+		return 0;
 	rump_inited = 1;
+
+	if (rump_version != RUMP_VERSION) {
+		printf("rump version mismatch, %d vs. %d\n",
+		    rump_version, RUMP_VERSION);
+		return EPROGMISMATCH;
+	}
 
 	if (rumpuser_getenv("RUMP_NVNODES", buf, sizeof(buf), &error) == 0) {
 		desiredvnodes = strtoul(buf, NULL, 10);
@@ -113,7 +133,7 @@ rump_init()
 		rump_threads = *buf != '0';
 	}
 
-	mutex_init(&rump_atomic_lock, MUTEX_DEFAULT, IPL_NONE);
+	rumpuser_mutex_recursive_init(&rump_giantlock.kmtx_mtx);
 
 	rumpvm_init();
 	rump_sleepers_init();
@@ -143,22 +163,30 @@ rump_init()
 
 	rump_limits.pl_rlimit[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 	rump_limits.pl_rlimit[RLIMIT_NOFILE].rlim_cur = RLIM_INFINITY;
+	rump_limits.pl_rlimit[RLIMIT_SBSIZE].rlim_cur = RLIM_INFINITY;
 
 	syncdelay = 0;
 	dovfsusermount = 1;
 
 	rumpuser_thrinit();
+	callout_startup();
+	callout_init_cpu(&rump_cpu);
 
+	once_init();
+	iostat_init();
+	uid_init();
+	percpu_init();
 	fd_sys_init();
 	module_init();
 	sysctl_init();
 	vfsinit();
 	bufinit();
 	wapbl_init();
-
+	softint_init(&rump_cpu);
 	rumpvfs_init();
 
-	rumpuser_mutex_recursive_init(&rump_giantlock.kmtx_mtx);
+	if (rump_net_init != __rump_net_unavailable)
+		rump_net_init();
 
 	/* aieeeedondest */
 	if (rump_threads) {
@@ -174,6 +202,8 @@ rump_init()
 
 	lwp0.l_fd = proc0.p_fd = fd_init(&rump_filedesc0);
 	rump_cwdi.cwdi_cdir = rootvnode;
+
+	return 0;
 }
 
 struct mount *
@@ -698,6 +728,8 @@ rump_setup_curlwp(pid_t pid, lwpid_t lid, int set)
 	l->l_proc = p;
 	l->l_lid = lid;
 	l->l_fd = p->p_fd;
+	l->l_mutex = RUMP_LMUTEX_MAGIC;
+	l->l_cpu = &rump_cpu;
 
 	if (set)
 		rumpuser_set_curlwp(l);
@@ -821,6 +853,19 @@ rump_cred_suserget()
 	return rump_susercred;
 }
 
+/* XXX: if they overflow, we're screwed */
+lwpid_t
+rump_nextlid()
+{
+	static unsigned lwpid = 2;
+
+	do {
+		lwpid = atomic_inc_uint_nv(&lwpid);
+	} while (lwpid == 0);
+
+	return (lwpid_t)lwpid;
+}
+
 int _syspuffs_stub(int, int *);
 int
 _syspuffs_stub(int fd, int *newfd)
@@ -828,5 +873,4 @@ _syspuffs_stub(int fd, int *newfd)
 
 	return ENODEV;
 }
-
 __weak_alias(syspuffs_glueinit,_syspuffs_stub);

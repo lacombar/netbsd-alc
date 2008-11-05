@@ -1,4 +1,4 @@
-/* $NetBSD: privcmd.c,v 1.30 2008/09/20 20:36:09 bouyer Exp $ */
+/* $NetBSD: privcmd.c,v 1.33 2008/10/21 15:46:32 cegger Exp $ */
 
 /*-
  * Copyright (c) 2004 Christian Limpach.
@@ -32,7 +32,7 @@
 
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: privcmd.c,v 1.30 2008/09/20 20:36:09 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: privcmd.c,v 1.33 2008/10/21 15:46:32 cegger Exp $");
 
 #include "opt_compat_netbsd.h"
 
@@ -369,6 +369,8 @@ privcmd_ioctl(void *v)
 			error = copyin(&mcmd->entry[i], &mentry, sizeof(mentry));
 			if (error)
 				return error;
+			if (mentry.npages == 0)
+				return EINVAL;
 			if (mentry.va > VM_MAXUSER_ADDRESS)
 				return EINVAL;
 #if 0
@@ -401,6 +403,7 @@ privcmd_ioctl(void *v)
 		u_long mfn, ma;
 		struct vm_map *vmm;
 		struct vm_map_entry *entry;
+		vm_prot_t prot;
 		pmap_t pmap;
 		vaddr_t trymap;
 
@@ -408,6 +411,8 @@ privcmd_ioctl(void *v)
 		pmap = vm_map_pmap(vmm);
 		va0 = pmb->addr & ~PAGE_MASK;
 
+		if (pmb->num == 0)
+			return EINVAL;
 		if (va0 > VM_MAXUSER_ADDRESS)
 			return EINVAL;
 		if (((VM_MAXUSER_ADDRESS - va0) >> PGSHIFT) < pmb->num)
@@ -418,6 +423,7 @@ privcmd_ioctl(void *v)
 			vm_map_unlock_read(vmm);
 			return EINVAL;
 		}
+		prot = entry->protection;
 		vm_map_unlock_read(vmm);
 		
 		maddr = kmem_alloc(sizeof(paddr_t) * pmb->num, KM_SLEEP);
@@ -442,8 +448,7 @@ privcmd_ioctl(void *v)
 			}
 			ma = mfn << PGSHIFT;
 			if (pmap_enter_ma(pmap_kernel(), trymap, ma, 0,
-			    entry->protection, PMAP_CANFAIL,
-			    pmb->dom)) {
+			    prot, PMAP_CANFAIL, pmb->dom)) {
 				mfn |= 0xF0000000;
 				copyout(&mfn, &pmb->arr[i], sizeof(mfn));
 				maddr[i] = INVALID_PAGE;
@@ -622,7 +627,7 @@ xenprivcmd_init()
 	kernfs_entry_t *dkt;
 	kfstype kfst;
 
-	if ((xen_start_info.flags & SIF_PRIVILEGED) == 0)
+	if (!xendomain_is_privileged())
 		return;
 
 	kfst = KERNFS_ALLOCTYPE(privcmd_fileops);

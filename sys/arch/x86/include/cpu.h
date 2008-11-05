@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.h,v 1.7 2008/05/30 11:03:29 ad Exp $	*/
+/*	$NetBSD: cpu.h,v 1.9 2008/10/25 19:13:40 mrg Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -58,6 +58,7 @@
 #include <x86/via_padlock.h>
 
 #include <sys/cpu_data.h>
+#include <sys/evcnt.h>
 
 #include <lib/libkern/libkern.h>	/* offsetof */
 
@@ -142,7 +143,8 @@ struct cpu_info {
 	uint32_t	ci_signature;	 /* X86 cpuid type */
 	uint32_t	ci_feature_flags;/* X86 %edx CPUID feature bits */
 	uint32_t	ci_feature2_flags;/* X86 %ecx CPUID feature bits */
-	uint32_t	ci_feature3_flags;/* X86 extended feature bits */
+	uint32_t	ci_feature3_flags;/* X86 extended %edx feature bits */
+	uint32_t	ci_feature4_flags;/* X86 extended %ecx feature bits */
 	uint32_t	ci_padlock_flags;/* VIA PadLock feature bits */
 	uint32_t	ci_vendor[4];	 /* vendor string */
 	uint32_t	ci_cpu_serial[3]; /* PIII serial number */

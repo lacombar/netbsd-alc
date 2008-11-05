@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.sys.mk,v 1.168 2008/09/26 18:23:09 apb Exp $
+#	$NetBSD: bsd.sys.mk,v 1.179 2008/10/26 23:13:24 apb Exp $
 #
 # Build definitions used for NetBSD source tree builds.
 
@@ -81,19 +81,17 @@ FFLAGS+=	-mieee
 .endif
 .endif
 
-.if defined(MKPIE) && (${MKPIE} != "no")
-.if !defined(KERNEL_BUILD)
-CFLAGS+=	-fPIC
-LDFLAGS+=	-Wl,-pie -shared-libgcc
-.endif
-.endif
-
 .if ${MACHINE} == "sparc64" && ${MACHINE_ARCH} == "sparc"
 CFLAGS+=	-Wa,-Av8plus
 .endif
 
 CFLAGS+=	${CPUFLAGS}
 AFLAGS+=	${CPUFLAGS}
+
+# Position Independent Executable flags
+PIE_CFLAGS?=        -fPIC -DPIC
+PIE_LDFLAGS?=       -Wl,-pie -shared-libgcc
+PIE_AFLAGS?=	    -fPIC -DPIC
 
 # Helpers for cross-compiling
 HOST_CC?=	cc
@@ -120,13 +118,8 @@ HOST_RANLIB?=	ranlib
 
 HOST_LN?=	ln
 
-HOST_SED?=	sed
-
-.if !empty(HOST_CYGWIN)
-HOST_SH?=	/usr/bin/bash
-.else
-HOST_SH?=	sh
-.endif
+# HOST_SH must be an absolute path
+HOST_SH?=	/bin/sh
 
 ELF2ECOFF?=	elf2ecoff
 MKDEP?=		mkdep
@@ -135,62 +128,7 @@ OBJDUMP?=	objdump
 PAXCTL?=	paxctl
 STRIP?=		strip
 
-AWK?=		awk
-
-TOOL_ASN1_COMPILE?=	asn1_compile
-TOOL_ATF_COMPILE?=	atf-compile
-TOOL_CAP_MKDB?=		cap_mkdb
-TOOL_CAT?=		cat
-TOOL_CKSUM?=		cksum
-TOOL_COMPILE_ET?=	compile_et
-TOOL_CONFIG?=		config
-TOOL_CRUNCHGEN?=	crunchgen
-TOOL_CTAGS?=		ctags
-TOOL_DB?=		db
-TOOL_EQN?=		eqn
-TOOL_FGEN?=		fgen
-TOOL_GENASSYM?=		genassym
-TOOL_GENCAT?=		gencat
-TOOL_GROFF?=		groff
-TOOL_HEXDUMP?=		hexdump
-TOOL_INDXBIB?=		indxbib
-TOOL_INSTALLBOOT?=	installboot
-TOOL_INSTALL_INFO?=	install-info
-TOOL_JOIN?=		join
-TOOL_M4?=		m4
-TOOL_MAKEFS?=		makefs
-TOOL_MAKEINFO?=		makeinfo
-TOOL_MAKEWHATIS?=	/usr/libexec/makewhatis
-TOOL_MDSETIMAGE?=	mdsetimage
-TOOL_MENUC?=		menuc
-TOOL_MKCSMAPPER?=	mkcsmapper
-TOOL_MKESDB?=		mkesdb
-TOOL_MKLOCALE?=		mklocale
-TOOL_MKMAGIC?=		file
-TOOL_MKTEMP?=		mktemp
-TOOL_MSGC?=		msgc
-TOOL_MTREE?=		mtree
-TOOL_PAX?=		pax
-TOOL_PIC?=		pic
-TOOL_POWERPCMKBOOTIMAGE?=	powerpc-mkbootimage
-TOOL_PWD_MKDB?=		pwd_mkdb
-TOOL_REFER?=		refer
-TOOL_ROFF_ASCII?=	nroff
-TOOL_ROFF_DVI?=		${TOOL_GROFF} -Tdvi
-TOOL_ROFF_HTML?=	${TOOL_GROFF} -Tlatin1 -mdoc2html
-TOOL_ROFF_PS?=		${TOOL_GROFF} -Tps
-TOOL_ROFF_RAW?=		${TOOL_GROFF} -Z
-TOOL_RPCGEN?=		rpcgen
-TOOL_SED?=		sed
-TOOL_SOELIM?=		soelim
-TOOL_STAT?=		stat
-TOOL_SPARKCRC?=		sparkcrc
-TOOL_strfile?=		strfile
-TOOL_SUNLABEL?=		sunlabel
-TOOL_TBL?=		tbl
-TOOL_UUDECODE?=		uudecode
-TOOL_VGRIND?=		vgrind -f
-TOOL_ZIC?=		zic
+# TOOL_* variables are defined in bsd.own.mk
 
 .SUFFIXES:	.o .ln .lo .c .cc .cpp .cxx .C .m ${YHEADER:D.h}
 

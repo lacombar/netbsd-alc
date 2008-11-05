@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.111 2008/09/06 19:01:20 jmcneill Exp $
+#	$NetBSD: Makefile,v 1.114 2008/10/19 22:05:23 apb Exp $
 
 .include <bsd.sys.mk>
 
@@ -25,7 +25,7 @@ INCS=	acct.h agpio.h aio.h ansi.h ataio.h atomic.h audioio.h \
 	param.h pipe.h pmc.h poll.h pool.h power.h proc.h \
 	protosw.h pset.h ptrace.h queue.h \
 	ras.h rb.h reboot.h radioio.h resource.h resourcevar.h rmd160.h \
-	rnd.h rwlock.h \
+	rnd.h rwlock.h sa.h satypes.h \
 	scanio.h sched.h scsiio.h select.h selinfo.h sem.h sha1.h sha2.h \
 	shm.h siginfo.h signal.h signalvar.h sigtypes.h simplelock.h \
 	sleepq.h socket.h \
@@ -55,6 +55,6 @@ INCSYMLINKS=\
 INCSYMLINKS+=	../soundcard.h ${INCSDIR}/soundcard.h
 
 namei: namei.src gennameih.awk
-	${AWK} -f gennameih.awk < namei.src > namei.h
+	${TOOL_AWK} -f gennameih.awk < namei.src > namei.h
 
 .include <bsd.kinc.mk>

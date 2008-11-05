@@ -1,4 +1,4 @@
-/*	$NetBSD: ksem.h,v 1.6 2006/03/05 00:49:19 cube Exp $	*/
+/*	$NetBSD: ksem.h,v 1.9 2008/10/22 11:57:14 ad Exp $	*/
 
 /*
  * Copyright (c) 2002 Alfred Perlstein <alfred@FreeBSD.org>
@@ -37,6 +37,8 @@ void ksem_init(void);
 int do_ksem_init(struct lwp *, unsigned int, semid_t *, copyout_t);
 int do_ksem_open(struct lwp *, const char *, int, mode_t, unsigned int,
     semid_t *, copyout_t);
+
+extern int	posix_semaphores;
 #endif
 
 #ifdef _LIBC

@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.inc,v 1.10 2008/08/04 14:35:24 pooka Exp $
+#	$NetBSD: Makefile.inc,v 1.12 2008/10/15 13:57:03 pooka Exp $
 #
 
 RUMPTOP=	${.CURDIR}/../../..

@@ -1,4 +1,4 @@
-/*	$NetBSD: output.c,v 1.29 2006/03/17 14:47:10 rumble Exp $	*/
+/*	$NetBSD: output.c,v 1.31 2008/10/31 14:38:42 christos Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)output.c	8.2 (Berkeley) 5/4/95";
 #else
-__RCSID("$NetBSD: output.c,v 1.29 2006/03/17 14:47:10 rumble Exp $");
+__RCSID("$NetBSD: output.c,v 1.31 2008/10/31 14:38:42 christos Exp $");
 #endif
 #endif /* not lint */
 
@@ -72,7 +72,6 @@ __RCSID("$NetBSD: output.c,v 1.29 2006/03/17 14:47:10 rumble Exp $");
 #define OUTBUFSIZ BUFSIZ
 #define BLOCK_OUT -2		/* output to a fixed block of memory */
 #define MEM_OUT -3		/* output to dynamically allocated memory */
-#define OUTPUT_ERR 01		/* error occurred on output */
 
 
 struct output output = {NULL, 0, NULL, OUTBUFSIZ, 1, 0};
@@ -135,6 +134,43 @@ outstr(const char *p, struct output *file)
 {
 	while (*p)
 		outc(*p++, file);
+	if (file == out2)
+		flushout(file);
+}
+
+
+void
+out2shstr(const char *p)
+{
+	outshstr(p, out2);
+}
+
+
+void
+outshstr(const char *p, struct output *file)
+{
+	static const char norm_chars [] \
+		= "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	int need_q = p[0] == 0 || p[strspn(p, norm_chars)] != 0;
+	char c;
+
+	if (need_q)
+		outc('\'', file);
+
+	while (c = *p++, c != 0){
+		if (c != '\''){
+			outc(c, file);
+		}else{
+			outc('\'', file);
+			outc('\\', file);
+			outc(c, file);
+			outc('\'', file);
+		}
+	}
+
+	if (need_q)
+		outc('\'', file);
+
 	if (file == out2)
 		flushout(file);
 }

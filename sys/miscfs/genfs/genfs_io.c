@@ -1,4 +1,4 @@
-/*	$NetBSD: genfs_io.c,v 1.11 2008/08/14 00:47:13 yamt Exp $	*/
+/*	$NetBSD: genfs_io.c,v 1.14 2008/10/31 20:42:41 christos Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: genfs_io.c,v 1.11 2008/08/14 00:47:13 yamt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: genfs_io.c,v 1.14 2008/10/31 20:42:41 christos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,8 +62,6 @@ static void genfs_dio_iodone(struct buf *);
 static int genfs_do_io(struct vnode *, off_t, vaddr_t, size_t, int, enum uio_rw,
     void (*)(struct buf *));
 static inline void genfs_rel_pages(struct vm_page **, int);
-
-#define MAX_READ_PAGES	16 	/* XXXUBC 16 */
 
 int genfs_maxdio = MAXPHYS;
 
@@ -119,7 +117,7 @@ genfs_getpages(void *v)
 	struct vnode *devvp;
 	struct genfs_node *gp = VTOG(vp);
 	struct uvm_object *uobj = &vp->v_uobj;
-	struct vm_page *pg, **pgs, *pgs_onstack[MAX_READ_PAGES];
+	struct vm_page *pg, **pgs, *pgs_onstack[UBC_MAX_PAGES];
 	int pgs_size;
 	kauth_cred_t cred = curlwp->l_cred;		/* XXXUBC curlwp */
 	const bool async = (flags & PGO_SYNCIO) == 0;
@@ -137,13 +135,8 @@ genfs_getpages(void *v)
 	KASSERT(vp->v_type == VREG || vp->v_type == VDIR ||
 	    vp->v_type == VLNK || vp->v_type == VBLK);
 
-	/* XXXUBC temp limit */
-	if (*ap->a_count > MAX_READ_PAGES) {
-		panic("genfs_getpages: too many pages");
-	}
-
-	pgs = pgs_onstack;
-	pgs_size = sizeof(pgs_onstack);
+	pgs = NULL;
+	pgs_size = 0;
 
 startover:
 	error = 0;
@@ -290,9 +283,11 @@ startover:
 			goto out_err;
 		}
 	} else {
-		/* pgs == pgs_onstack */
-		memset(pgs, 0, pgs_size);
+		pgs = pgs_onstack;
+		(void)memset(pgs, 0, pgs_size);
 	}
+
+
 	UVMHIST_LOG(ubchist, "ridx %d npages %d startoff %ld endoff %ld",
 	    ridx, npages, startoffset, endoffset);
 
@@ -690,7 +685,7 @@ out:
 	}
 
 out_err:
-	if (pgs != pgs_onstack)
+	if (pgs != NULL && pgs != pgs_onstack)
 		kmem_free(pgs, pgs_size);
 	if (has_trans)
 		fstrans_done(vp->v_mount);
@@ -779,6 +774,7 @@ genfs_do_putpages(struct vnode *vp, off_t startoff, off_t endoff,
 	int flags;
 	int dirtygen;
 	bool modified;
+	bool need_wapbl;
 	bool has_trans;
 	bool cleanall;
 	bool onworklst;
@@ -793,6 +789,8 @@ genfs_do_putpages(struct vnode *vp, off_t startoff, off_t endoff,
 	    vp, uobj->uo_npages, startoff, endoff - startoff);
 
 	has_trans = false;
+	need_wapbl = (!pagedaemon && vp->v_mount && vp->v_mount->mnt_wapbl &&
+	    (origflags & PGO_JOURNALLOCKED) == 0);
 
 retry:
 	modified = false;
@@ -805,8 +803,11 @@ retry:
 			if (LIST_FIRST(&vp->v_dirtyblkhd) == NULL)
 				vn_syncer_remove_from_worklist(vp);
 		}
-		if (has_trans)
+		if (has_trans) {
+			if (need_wapbl)
+				WAPBL_END(vp->v_mount);
 			fstrans_done(vp->v_mount);
+		}
 		mutex_exit(slock);
 		return (0);
 	}
@@ -823,6 +824,13 @@ retry:
 				return error;
 		} else
 			fstrans_start(vp->v_mount, FSTRANS_LAZY);
+		if (need_wapbl) {
+			error = WAPBL_BEGIN(vp->v_mount);
+			if (error) {
+				fstrans_done(vp->v_mount);
+				return error;
+			}
+		}
 		has_trans = true;
 		mutex_enter(slock);
 		goto retry;
@@ -1196,8 +1204,11 @@ skip_scan:
 		goto retry;
 	}
 
-	if (has_trans)
+	if (has_trans) {
+		if (need_wapbl)
+			WAPBL_END(vp->v_mount);
 		fstrans_done(vp->v_mount);
+	}
 
 	return (error);
 }
@@ -1569,6 +1580,12 @@ genfs_directio(struct vnode *vp, struct uio *uio, int ioflag)
 		return;
 	}
 
+	if ((ioflag & IO_JOURNALLOCKED) == 0) {
+		error = WAPBL_BEGIN(vp->v_mount);
+		if (error)
+			return;
+	}
+
 	/*
 	 * Do as much of the uio as possible with direct I/O.
 	 */
@@ -1591,7 +1608,7 @@ genfs_directio(struct vnode *vp, struct uio *uio, int ioflag)
 		 */
 
 		if (len == 0 || uio->uio_offset + len > vp->v_size) {
-			return;
+			break;
 		}
 
 		/*
@@ -1602,7 +1619,7 @@ genfs_directio(struct vnode *vp, struct uio *uio, int ioflag)
 		 */
 
 		if (uio->uio_offset & mask || va & mask) {
-			return;
+			break;
 		}
 		error = genfs_do_directio(vs, va, len, vp, uio->uio_offset,
 					  uio->uio_rw);
@@ -1614,6 +1631,9 @@ genfs_directio(struct vnode *vp, struct uio *uio, int ioflag)
 		uio->uio_offset += len;
 		uio->uio_resid -= len;
 	}
+
+	if ((ioflag & IO_JOURNALLOCKED) == 0)
+		WAPBL_END(vp->v_mount);
 }
 
 /*
@@ -1650,7 +1670,7 @@ genfs_do_directio(struct vmspace *vs, vaddr_t uva, size_t len, struct vnode *vp,
 	paddr_t pa;
 	vm_prot_t prot;
 	int error, rv, poff, koff;
-	const int pgoflags = PGO_CLEANIT | PGO_SYNCIO |
+	const int pgoflags = PGO_CLEANIT | PGO_SYNCIO | PGO_JOURNALLOCKED |
 		(rw == UIO_WRITE ? PGO_FREE : 0);
 
 	/*

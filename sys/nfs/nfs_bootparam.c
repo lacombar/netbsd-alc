@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_bootparam.c,v 1.32 2008/04/28 20:24:10 martin Exp $	*/
+/*	$NetBSD: nfs_bootparam.c,v 1.34 2008/10/27 10:58:22 cegger Exp $	*/
 
 /*-
  * Copyright (c) 1995, 1997 The NetBSD Foundation, Inc.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: nfs_bootparam.c,v 1.32 2008/04/28 20:24:10 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: nfs_bootparam.c,v 1.34 2008/10/27 10:58:22 cegger Exp $");
 
 #include "opt_nfs_boot.h"
 #include "opt_inet.h"
@@ -86,10 +86,10 @@ __KERNEL_RCSID(0, "$NetBSD: nfs_bootparam.c,v 1.32 2008/04/28 20:24:10 martin Ex
  */
 
 /* bootparam RPC */
-static int bp_whoami __P((struct sockaddr_in *bpsin,
-	struct in_addr *my_ip, struct in_addr *gw_ip, struct lwp *l));
-static int bp_getfile __P((struct sockaddr_in *bpsin, const char *key,
-	struct nfs_dlmount *ndm, struct lwp *l));
+static int bp_whoami (struct sockaddr_in *bpsin,
+	struct in_addr *my_ip, struct in_addr *gw_ip, struct lwp *l);
+static int bp_getfile (struct sockaddr_in *bpsin, const char *key,
+	struct nfs_dlmount *ndm, struct lwp *l);
 
 
 /*
@@ -103,9 +103,7 @@ static int bp_getfile __P((struct sockaddr_in *bpsin, const char *key,
  * is used for all subsequent booptaram RPCs.
  */
 int
-nfs_bootparam(nd, lwp)
-	struct nfs_diskless *nd;
-	struct lwp *lwp;
+nfs_bootparam(struct nfs_diskless *nd, struct lwp *lwp, int *flags)
 {
 	struct ifnet *ifp = nd->nd_ifp;
 	struct in_addr my_ip, arps_ip, gw_ip;
@@ -143,9 +141,12 @@ nfs_bootparam(nd, lwp)
 		goto out;
 	}
 
-	nd->nd_myip.s_addr = my_ip.s_addr;
-	printf("nfs_boot: client_addr=%s", inet_ntoa(my_ip));
-	printf(" (RARP from %s)\n", inet_ntoa(arps_ip));
+	if (!(*flags & NFS_BOOT_HAS_MYIP)) {
+		nd->nd_myip.s_addr = my_ip.s_addr;
+		printf("nfs_boot: client_addr=%s", inet_ntoa(my_ip));
+		printf(" (RARP from %s)\n", inet_ntoa(arps_ip));
+		*flags |= NFS_BOOT_HAS_MYIP;
+	}
 
 	/*
 	 * Do enough of ifconfig(8) so that the chosen interface
@@ -264,6 +265,9 @@ gwok:
 	if (gw_ndm)
 		kmem_free(gw_ndm, sizeof(*gw_ndm));
 #endif
+	if ((*flags & NFS_BOOT_ALLINFO) != NFS_BOOT_ALLINFO)
+		return error ? error : EADDRNOTAVAIL;
+
 	return (error);
 }
 
@@ -284,11 +288,8 @@ gwok:
  * know about us (don't want to broadcast a getport call).
  */
 static int
-bp_whoami(bpsin, my_ip, gw_ip, l)
-	struct sockaddr_in *bpsin;
-	struct in_addr *my_ip;
-	struct in_addr *gw_ip;
-	struct lwp *l;
+bp_whoami(struct sockaddr_in *bpsin, struct in_addr *my_ip,
+	struct in_addr *gw_ip, struct lwp *l)
 {
 	/* RPC structures for PMAPPROC_CALLIT */
 	struct whoami_call {
@@ -392,11 +393,8 @@ out:
  *	server pathname
  */
 static int
-bp_getfile(bpsin, key, ndm, l)
-	struct sockaddr_in *bpsin;
-	const char *key;
-	struct nfs_dlmount *ndm;
-	struct lwp *l;
+bp_getfile(struct sockaddr_in *bpsin, const char *key,
+	struct nfs_dlmount *ndm, struct lwp *l)
 {
 	char pathname[MNAMELEN];
 	struct in_addr inaddr;

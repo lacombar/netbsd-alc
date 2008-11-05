@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_machdep.c,v 1.138 2008/09/18 15:57:04 christos Exp $	*/
+/*	$NetBSD: linux_machdep.c,v 1.141 2008/10/25 23:38:28 christos Exp $	*/
 
 /*-
  * Copyright (c) 1995, 2000, 2008 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.138 2008/09/18 15:57:04 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_machdep.c,v 1.141 2008/10/25 23:38:28 christos Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_vm86.h"
@@ -297,9 +297,6 @@ linux_rt_sendsig(const ksiginfo_t *ksi, const sigset_t *mask)
 		lsi->lsi_pid = ksi->ksi_pid;
 		lsi->lsi_utime = ksi->ksi_utime;
 		lsi->lsi_stime = ksi->ksi_stime;
-
-		/* We use the same codes */
-		lsi->lsi_code = ksi->ksi_code;
 		/* XXX is that right? */
 		lsi->lsi_status = WEXITSTATUS(ksi->ksi_status);
 		break;
@@ -1120,7 +1117,9 @@ linux_get_uname_arch(void)
 void *
 linux_get_newtls(struct lwp *l)
 {
+#if 0
 	struct trapframe *tf = l->l_md.md_regs;
+#endif
 
 	/* XXX: Implement me */
 	return NULL;

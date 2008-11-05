@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.lib.mk,v 1.286 2008/09/09 11:54:19 joerg Exp $
+#	$NetBSD: bsd.lib.mk,v 1.289 2008/10/19 22:05:21 apb Exp $
 #	@(#)bsd.lib.mk	8.3 (Berkeley) 4/22/94
 
 .include <bsd.init.mk>
@@ -34,6 +34,13 @@ realinstall:	checkver libinstall
 clean:		cleanlib
 
 ##### LIB specific flags.
+# XXX: This is needed for programs that link with .a libraries
+# Perhaps a more correct solution is to always generate _pic.a
+# files or always have a shared library.
+.if defined(MKPIE) && (${MKPIE} != "no")
+CFLAGS+=        ${PIE_CFLAGS}
+AFLAGS+=        ${PIE_AFLAGS}
+.endif
 COPTS+=     ${COPTS.lib${LIB}}
 CPPFLAGS+=  ${CPPFLAGS.lib${LIB}}
 CXXFLAGS+=  ${CXXFLAGS.lib${LIB}}
@@ -69,6 +76,7 @@ SHLIB_TEENY != . ${SHLIB_VERSION_FILE} ; echo $$teeny
 	exists(${NETBSDSRCDIR}/lib/checkver)
 checkver:
 	@(cd ${.CURDIR} && \
+	    HOST_SH=${HOST_SH:Q} AWK=${TOOL_AWK:Q} \
 	    ${HOST_SH} ${NETBSDSRCDIR}/lib/checkver -v ${SHLIB_VERSION_FILE} \
 		    -d ${DESTDIR}${_LIBSODIR} ${LIB})
 .endif

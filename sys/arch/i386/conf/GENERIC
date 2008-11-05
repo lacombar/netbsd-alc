@@ -1,4 +1,4 @@
-# $NetBSD: GENERIC,v 1.910 2008/09/30 16:45:33 jmcneill Exp $
+# $NetBSD: GENERIC,v 1.915 2008/10/29 11:56:53 joerg Exp $
 #
 # GENERIC machine description file
 #
@@ -22,7 +22,7 @@ include 	"arch/i386/conf/std.i386"
 
 options 	INCLUDE_CONFIG_FILE	# embed config file in kernel binary
 
-#ident 		"GENERIC-$Revision: 1.910 $"
+#ident 		"GENERIC-$Revision: 1.915 $"
 
 maxusers	64		# estimated number of users
 
@@ -89,6 +89,7 @@ options 	NTP		# NTP phase/frequency locked loop
 
 options 	KTRACE		# system call tracing via ktrace(1)
 
+# Note: SysV IPC parameters could be changed dynamically, see sysctl(8).
 options 	SYSVMSG		# System V-like message queues
 options 	SYSVSEM		# System V-like semaphores
 options 	SYSVSHM		# System V-like memory sharing
@@ -446,7 +447,7 @@ amdtemp* at pci? dev ? function ?	# AMD CPU Temperature sensors
 # PCI bridges
 #amdpcib* at pci? dev ? function ?	# AMD 8111 PCI-ISA w/ HPET
 #hpet* 	at amdpcib?
-#ichlpcib* at pci? dev ? function ?	# Intel ICH PCI-ISA w/ timecounter,
+ichlpcib* at pci? dev ? function ?	# Intel ICH PCI-ISA w/ timecounter,
 					# watchdog, SpeedStep and HPET
 #hpet* 	at ichlpcib?
 gcscpcib* at pci? dev ? function ?	# AMD CS5535/CS5536 PCI-ISA w/
@@ -473,7 +474,7 @@ eisa0	at pceb?
 # ISA bus support
 #isa0 	at amdpcib?
 isa0 	at gcscpcib?
-#isa0	at ichlpcib?
+isa0	at ichlpcib?
 #isa0	at piixpcib?
 #isa0	at gscpcib?
 #isa0	at viapcib?
@@ -631,9 +632,10 @@ iic*	at nfsmb?
 piixpm* at pci? dev ? function ?	# PIIX4 compatible PM controller
 iic*	at piixpm?			# SMBus on PIIX4
 
-#adt7463c* at iic? addr 0x2C		# Unknown other motherboard(s)
-#adt7463c* at iic? addr 0x2D		# Tyan S2881
-#adt7463c* at iic? addr 0x2E		# Tyan S2882-D
+# dbCool Thermal monitor and fan controller
+#dbcool* at iic? addr 0x2C		# Unknown other motherboard(s)
+#dbcool* at iic? addr 0x2D		# Tyan S2881
+#dbcool* at iic? addr 0x2E		# Tyan S2882-D
 
 # IBM Thinkpad Active Protection System
 #aps0 	at isa? port 0x1600
@@ -906,6 +908,7 @@ hme*	at pci? dev ? function ?	# Sun Microelectronics STP2002-STQ
 ipw*	at pci? dev ? function ?	# Intel PRO/Wireless 2100
 iwi*	at pci? dev ? function ?	# Intel PRO/Wireless 2200BG
 iwn*	at pci? dev ? function ?	# Intel PRO/Wireless 4965AGN
+jme*	at pci? dev ? function ?	# JMicron JMC2[56]0 ethernet
 le*	at pci? dev ? function ?	# PCnet-PCI Ethernet
 lii*	at pci? dev ? function ?	# Atheros L2 Fast-Ethernet
 lmc*	at pci? dev ? function ?	# Lan Media Corp SSI/HSSI/DS3
@@ -1213,6 +1216,10 @@ radio*	at udsbr?
 ugen*	at uhub? port ?
 # On ugen bulk endpoints, perform read-ahead and write-behind.
 options UGEN_BULK_RA_WB
+
+# USB 3G datacards
+u3g*	at uhub? port ?
+ucom*	at u3g?
 
 # USB generic serial port (e.g., data over cellular)
 ugensa*	at uhub? port ?

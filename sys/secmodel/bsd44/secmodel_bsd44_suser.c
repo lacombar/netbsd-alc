@@ -1,4 +1,4 @@
-/* $NetBSD: secmodel_bsd44_suser.c,v 1.57 2008/03/09 15:39:14 rmind Exp $ */
+/* $NetBSD: secmodel_bsd44_suser.c,v 1.59 2008/10/22 11:16:29 ad Exp $ */
 /*-
  * Copyright (c) 2006 Elad Efrat <elad@NetBSD.org>
  * All rights reserved.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: secmodel_bsd44_suser.c,v 1.57 2008/03/09 15:39:14 rmind Exp $");
+__KERNEL_RCSID(0, "$NetBSD: secmodel_bsd44_suser.c,v 1.59 2008/10/22 11:16:29 ad Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +56,7 @@ __KERNEL_RCSID(0, "$NetBSD: secmodel_bsd44_suser.c,v 1.57 2008/03/09 15:39:14 rm
 #include <sys/ptrace.h>
 #include <sys/vnode.h>
 #include <sys/proc.h>
+#include <sys/uidinfo.h>
 
 #include <miscfs/procfs/procfs.h>
 
@@ -370,6 +371,8 @@ secmodel_bsd44_suser_system_cb(kauth_cred_t cred, kauth_action_t action,
 
 	case KAUTH_SYSTEM_MODULE:
 		if (isroot)
+			result = KAUTH_RESULT_ALLOW;
+		if ((uintptr_t)arg1 != 0)	/* autoload */
 			result = KAUTH_RESULT_ALLOW;
 		break;
 

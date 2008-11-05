@@ -1,4 +1,4 @@
-/*	$NetBSD: exception.c,v 1.50 2008/06/07 22:04:40 uwe Exp $	*/
+/*	$NetBSD: exception.c,v 1.52 2008/10/21 04:16:59 wrstuden Exp $	*/
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc. All rights reserved.
@@ -79,7 +79,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: exception.c,v 1.50 2008/06/07 22:04:40 uwe Exp $");
+__KERNEL_RCSID(0, "$NetBSD: exception.c,v 1.52 2008/10/21 04:16:59 wrstuden Exp $");
 
 #include "opt_ddb.h"
 #include "opt_kgdb.h"
@@ -469,4 +469,17 @@ ast(struct lwp *l, struct trapframe *tf)
 
 		userret(l);
 	}
+}
+
+/*
+ * void upcallret(struct lwp *l):
+ *
+ *     Perform userret() for an LWP.
+ *     XXX This is a terrible name.
+ */
+void
+upcallret(struct lwp *l)
+{
+
+	userret(l);
 }

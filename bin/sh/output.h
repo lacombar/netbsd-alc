@@ -1,4 +1,4 @@
-/*	$NetBSD: output.h,v 1.18 2008/03/29 09:49:52 apb Exp $	*/
+/*	$NetBSD: output.h,v 1.20 2008/10/31 14:38:42 christos Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -47,6 +47,9 @@ struct output {
 	short flags;
 };
 
+/* flags for ->flags */
+#define OUTPUT_ERR 01		/* error occurred on output */
+
 extern struct output output;
 extern struct output errout;
 extern struct output memout;
@@ -57,6 +60,8 @@ void open_mem(char *, int, struct output *);
 void out1str(const char *);
 void out2str(const char *);
 void outstr(const char *, struct output *);
+void out2shstr(const char *);
+void outshstr(const char *, struct output *);
 void emptyoutbuf(struct output *);
 void flushall(void);
 void flushout(struct output *);

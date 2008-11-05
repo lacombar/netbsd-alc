@@ -1,4 +1,4 @@
-.\"	$NetBSD: sockopt.9,v 1.1 2008/08/06 15:08:08 plunky Exp $
+.\"	$NetBSD: sockopt.9,v 1.5 2008/10/28 18:42:54 wiz Exp $
 .\"
 .\" Copyright (c) 2008 Iain Hibbert
 .\" All rights reserved.
@@ -23,7 +23,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd August 6, 2008
+.Dd October 28, 2008
 .Dt SOCKOPT 9
 .Os
 .Sh NAME
@@ -87,17 +87,20 @@ is given,
 will arrange for sopt_data to point to a buffer of
 .Ar size
 bytes for the sockopt value.
+Where memory needs to be allocated to satisfy this,
+.Fn sockopt_init
+may sleep.
 .It Fn sockopt_destroy "sopt"
 Destroy sockopt storage, releasing any allocated memory.
 .It Fn sockopt_get "sopt" "value" "size"
 Copy out sockopt value.
 Will return
-.Dv EINVAL 
+.Er EINVAL
 if an incorrect data size is given.
 .It Fn sockopt_getint "sopt" "value"
 Common case of get sockopt integer value.
 Will return
-.Dv EINVAL 
+.Er EINVAL
 if sockopt does not contain an integer sized value.
 .It Fn sockopt_set "sopt" "value" "size"
 Copy in sockopt value.
@@ -105,7 +108,21 @@ The sockopt structure must contain a data field of
 .Ar size
 bytes or be previously unset, in which case a data buffer may be
 allocated using
-.Dv M_WAITOK .
+.Xr kmem_alloc 9
+with the
+.Dv KM_NOSLEEP
+flag which may cause
+.Fn sockopt_set
+to return
+.Er ENOMEM .
+.Pp
+Note: If you need to use
+.Fn sockopt_set
+in a context where memory allocation may be required and you do not wish to
+contemplate failure, the sockopt structure can be initialised in a more suitable
+context using
+.Fn sockopt_init
+which will not fail.
 .It Fn sockopt_setint "sopt" "value"
 Common case of set sockopt integer value.
 The sockpt structure must contain an int sized data field or be previously
@@ -124,8 +141,10 @@ header file, and the socket options implementation is in
 .Pa sys/kern/uipc_socket.c .
 .Sh SEE ALSO
 .Xr errno 2 ,
-.Xr malloc 9
+.Xr kmem_alloc 9
 .Sh HISTORY
-The socket options KPI was inspired by a similar KPI in FreeBSD and
+The socket options KPI was inspired by a similar KPI in
+.Fx
+and
 first appeared in
 .Nx 5.0 .

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_eon.c,v 1.66 2008/05/15 02:07:57 dyoung Exp $	*/
+/*	$NetBSD: if_eon.c,v 1.68 2008/10/24 17:07:33 dyoung Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -67,7 +67,7 @@ SOFTWARE.
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_eon.c,v 1.66 2008/05/15 02:07:57 dyoung Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_eon.c,v 1.68 2008/10/24 17:07:33 dyoung Exp $");
 
 #include "opt_eon.h"
 
@@ -149,7 +149,7 @@ eonattach(void)
 	ifp->if_ioctl = eonioctl;
 	ifp->if_output = eonoutput;
 	ifp->if_type = IFT_EON;
-	ifp->if_addrlen = 5;
+	ifp->if_addrlen = 0;
 	ifp->if_hdrlen = EONIPLEN;
 	ifp->if_flags = IFF_BROADCAST;
 	if_attach(ifp);
@@ -251,7 +251,7 @@ eoniphdr(struct eon_iphdr *hdr, const void *loc, struct route *ro, int class)
  * RETURNS:			nothing
  */
 void
-eonrtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info)
+eonrtrequest(int cmd, struct rtentry *rt, const struct rt_addrinfo *info)
 {
 	struct rtentry *nrt;
 	unsigned long   zerodst = 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: socketvar.h,v 1.113 2008/08/06 15:01:24 plunky Exp $	*/
+/*	$NetBSD: socketvar.h,v 1.116 2008/10/14 13:45:26 ad Exp $	*/
 
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
@@ -69,10 +69,12 @@
 #include <sys/lkm.h>
 #endif
 
-#if !defined(_KERNEL) || defined(LKM)
+#if !defined(_KERNEL)
 struct uio;
 struct lwp;
 struct uidinfo;
+#else
+#include <sys/uidinfo.h>
 #endif
 
 TAILQ_HEAD(soqhead, socket);
@@ -216,7 +218,8 @@ struct accept_filter {
 		(struct socket *so, char *arg);
 	void	(*accf_destroy)
 		(struct socket *so);
-	SLIST_ENTRY(accept_filter) accf_next;
+	LIST_ENTRY(accept_filter) accf_next;
+	u_int	accf_refcnt;
 };
 
 struct sockopt {
@@ -529,10 +532,11 @@ void	soloanfree(struct mbuf *, void *, size_t, void *);
 /*
  * Accept filter functions (duh).
  */
-int	do_getopt_accept_filter(struct socket *, struct sockopt *);
-int	do_setopt_accept_filter(struct socket *, const struct sockopt *);
+int	accept_filt_getopt(struct socket *, struct sockopt *);
+int	accept_filt_setopt(struct socket *, const struct sockopt *);
+int	accept_filt_clear(struct socket *);
 int	accept_filt_add(struct accept_filter *);
-int	accept_filt_del(char *);
+int	accept_filt_del(struct accept_filter *);
 struct	accept_filter *accept_filt_get(char *);
 #ifdef ACCEPT_FILTER_MOD
 #ifdef SYSCTL_DECL

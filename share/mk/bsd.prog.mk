@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.prog.mk,v 1.235 2008/09/09 11:54:19 joerg Exp $
+#	$NetBSD: bsd.prog.mk,v 1.239 2008/10/19 15:22:50 christos Exp $
 #	@(#)bsd.prog.mk	8.2 (Berkeley) 4/2/94
 
 .ifndef HOSTPROG
@@ -51,6 +51,12 @@ CLEANFILES+=strings
 	@rm -f x.cc
 .endif
 
+.if defined(MKPIE) && (${MKPIE} != "no")
+CFLAGS+=	${PIE_CFLAGS}
+AFLAGS+=	${PIE_AFLAGS}
+LDFLAGS+=	${PIE_LDFLAGS}
+.endif
+
 ##### Default values
 CPPFLAGS+=	${DESTDIR:D-nostdinc ${CPPFLAG_ISYSTEM} ${DESTDIR}/usr/include}
 CXXFLAGS+=	${DESTDIR:D-nostdinc++ ${CPPFLAG_ISYSTEMXX} ${DESTDIR}/usr/include/g++}
@@ -91,7 +97,7 @@ LIBCRT0=	${DESTDIR}/usr/lib/crt0.o
 	archive asn1 bluetooth bsdmalloc bz2 c c_pic cdk com_err compat \
 	crypt crypto crypto_idea crypto_mdc2 crypto_rc5 \
 	curses dbm des edit event \
-	form fl g2c gcc gnumalloc gssapi hdb heimntlm hx509 intl ipsec \
+	fetch form fl g2c gcc gnumalloc gssapi hdb heimntlm hx509 intl ipsec \
 	kadm5clnt kadm5srv kafs krb5 kvm l lber ldap ldap_r \
 	m magic menu objc ossaudio pam pcap pci pmc posix pthread pthread_dbg \
 	puffs radius resolv rmt roken rpcsvc rt rump rumpuser sdp skey sl ss \

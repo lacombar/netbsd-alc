@@ -1,4 +1,4 @@
-/*	$NetBSD: pmap.c,v 1.187 2008/09/28 21:27:11 skrll Exp $	*/
+/*	$NetBSD: pmap.c,v 1.189 2008/11/04 07:21:24 matt Exp $	*/
 
 /*
  * Copyright 2003 Wasabi Systems, Inc.
@@ -212,7 +212,7 @@
 #include <machine/param.h>
 #include <arm/arm32/katelib.h>
 
-__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.187 2008/09/28 21:27:11 skrll Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pmap.c,v 1.189 2008/11/04 07:21:24 matt Exp $");
 
 #ifdef PMAP_DEBUG
 
@@ -441,6 +441,7 @@ EVCNT_ATTACH_STATIC(pmap_ev_activations);
 static pt_entry_t *csrc_pte, *cdst_pte;
 static vaddr_t csrcp, cdstp;
 vaddr_t memhook;			/* used by mem.c */
+kmutex_t memlock;			/* used by mem.c */
 extern void *msgbufaddr;
 int pmap_kmpages;
 /*
@@ -1690,6 +1691,7 @@ pmap_vac_me_user(struct vm_page *pg, pmap_t pm, vaddr_t va)
 	 * Include kernel mappings as part of our own.
 	 * Keep a pointer to the first one.
 	 */
+	npv = NULL;
 	SLIST_FOREACH(pv, &pg->mdpage.pvh_list, pv_link) {
 		/* Count mappings in the same pmap */
 		if (pm == pv->pv_pmap || kpmap == pv->pv_pmap) {
@@ -2980,10 +2982,12 @@ pmap_enter(pmap_t pm, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 		}
 	}
 #if defined(PMAP_CACHE_VIPT) && defined(DIAGNOSTIC)
-	simple_lock(&pg->mdpage.pvh_slock);
-	KASSERT((pg->mdpage.pvh_attrs & PVF_DMOD) == 0 || (pg->mdpage.pvh_attrs & (PVF_DIRTY|PVF_NC)));
-	KASSERT(((pg->mdpage.pvh_attrs & PVF_WRITE) == 0) == (pg->mdpage.urw_mappings + pg->mdpage.krw_mappings == 0));
-	simple_unlock(&pg->mdpage.pvh_slock);
+	if (pg) {
+		simple_lock(&pg->mdpage.pvh_slock);
+		KASSERT((pg->mdpage.pvh_attrs & PVF_DMOD) == 0 || (pg->mdpage.pvh_attrs & (PVF_DIRTY|PVF_NC)));
+		KASSERT(((pg->mdpage.pvh_attrs & PVF_WRITE) == 0) == (pg->mdpage.urw_mappings + pg->mdpage.krw_mappings == 0));
+		simple_unlock(&pg->mdpage.pvh_slock);
+	}
 #endif
 
 	pmap_release_pmap_lock(pm);
@@ -5284,6 +5288,8 @@ pmap_init(void)
 	    (PAGE_SIZE / sizeof(struct pv_entry)) * 2);
 
 	pmap_initialized = true;
+
+	mutex_init(&memlock, MUTEX_DEFAULT, IPL_NONE);
 }
 
 static vaddr_t last_bootstrap_page = 0;

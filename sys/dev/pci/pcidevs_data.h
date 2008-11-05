@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.960 2008/10/01 17:16:15 christos Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.964 2008/11/04 13:23:41 cegger Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.960 2008/10/01 15:38:14 christos Exp
+ *	NetBSD: pcidevs,v 1.964 2008/11/04 13:22:29 cegger Exp
  */
 
 /*
@@ -4740,6 +4740,122 @@ static const struct pci_product pci_products[] = {
 	    "Radeon Xpress Series (RS482M)",
 	},
 	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GFX0_A,
+	    "RD790 PCI Bridge GFX0 Port A",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GFX0_B,
+	    "RD790 PCI Bridge GFX0 Port B",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GPP_A,
+	    "RD790 PCI Express Bridge GPP Port A",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GPP_B,
+	    "RD790 PCI Express Bridge GPP Port B",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GPP_C,
+	    "RD790 PCI Express Bridge GPP Port C",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GPP_D,
+	    "RD790 PCI Express Bridge GPP Port D",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GPP_E,
+	    "RD790 PCI Express Bridge GPP Port E",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GPP_F,
+	    "RD790 PCI Express Bridge GPP Port F",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GFX1_A,
+	    "RD790 PCI Bridge GFX1 Port A",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_GFX1_B,
+	    "RD790 PCI Bridge GFX1 Port B",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD790_PPB_NBSB,
+	    "RD790 PCI Bridge (NB-SB link)",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_NB_DS16,
+	    "RD890 Northbridge Dual Slot 2x16 GFX",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_NB_SS,
+	    "RD890 Northbridge Single Slot GFX",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_NB_DS8,
+	    "RD890 Northbridge Dual Slot 2x8 GFX",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GFX0_A,
+	    "RD890 PCI Bridge GFX0 Port A",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GFX0_B,
+	    "RD890 PCI Bridge GFX0 Port B",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_A,
+	    "RD890 PCI Express Bridge GPP Port A",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_B,
+	    "RD890 PCI Express Bridge GPP Port B",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_C,
+	    "RD890 PCI Express Bridge GPP Port C",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_D,
+	    "RD890 PCI Express Bridge GPP Port D",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_E,
+	    "RD890 PCI Express Bridge GPP Port E",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_F,
+	    "RD890 PCI Express Bridge GPP Port F",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_G,
+	    "RD890 PCI Express Bridge GPP Port G",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GPP_H,
+	    "RD890 PCI Express Bridge GPP Port H",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GFX1_A,
+	    "RD890 PCI Bridge GFX1 Port A",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_GFX1_B,
+	    "RD890 PCI Bridge GFX1 Port B",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_PPB_NBSB,
+	    "RD890 PCI Bridge (NB-SB link)",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RD890_IOMMU,
+	    "RD890 IOMMU",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RADEON_XPRESS_200,
+	    "Radeon Xpress 200",
+	},
+	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS480_XRP,
 	    "RS480 PCI Express Root Port",
 	},
@@ -7664,6 +7780,10 @@ static const struct pci_product pci_products[] = {
 	    "82801I (AMT) LAN Controller",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801I_IGP_M,
+	    "82801I mobile LAN controller",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801I_IFE,
 	    "82801I LAN Controller",
 	},
@@ -7684,8 +7804,16 @@ static const struct pci_product pci_products[] = {
 	    "i82801H IFE (G) LAN Controller",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801H_IGP_M_V,
+	    "i82801H IGP (MV) LAN Controller",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82567V,
 	    "i82567V LAN controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801I_IGP_M_AMT,
+	    "82801I mobile (AMT) LAN controller",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82815_DC100_HUB,
@@ -14496,4 +14624,4 @@ static const struct pci_product pci_products[] = {
 	    "Video Controller",
 	},
 };
-const int pci_nproducts = 3023;
+const int pci_nproducts = 3055;

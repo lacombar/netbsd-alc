@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.530 2008/09/26 18:23:09 apb Exp $
+#	$NetBSD: bsd.own.mk,v 1.542 2008/10/29 23:46:52 macallan Exp $
 
 .if !defined(_BSD_OWN_MK_)
 _BSD_OWN_MK_=1
@@ -129,7 +129,6 @@ _HOST_ARCH!=	uname -p 2>/dev/null || uname -m
 HOST_OSTYPE:=	${_HOST_OSNAME}-${_HOST_OSREL:C/\([^\)]*\)//g:[*]:C/ /_/g}-${_HOST_ARCH:C/\([^\)]*\)//g:[*]:C/ /_/g}
 .MAKEOVERRIDES+= HOST_OSTYPE
 .endif
-HOST_CYGWIN=	${HOST_OSTYPE:MCYGWIN*}
 
 .if ${USETOOLS} == "yes"						# {
 
@@ -215,8 +214,7 @@ TOOL_AMIGAELF2BB=	${TOOLDIR}/bin/${_TOOL_PREFIX}amiga-elf2bb
 TOOL_AMIGATXLT=		${TOOLDIR}/bin/${_TOOL_PREFIX}amiga-txlt
 TOOL_ASN1_COMPILE=	${TOOLDIR}/bin/${_TOOL_PREFIX}asn1_compile
 TOOL_ATF_COMPILE=	${TOOLDIR}/bin/${_TOOL_PREFIX}atf-compile
-TOOL_BEBOXELF2PEF=	${TOOLDIR}/bin/${_TOOL_PREFIX}bebox-elf2pef
-TOOL_BEBOXMKBOOTIMAGE=	${TOOLDIR}/bin/${_TOOL_PREFIX}bebox-mkbootimage
+TOOL_AWK=		${TOOLDIR}/bin/${_TOOL_PREFIX}awk
 TOOL_CAP_MKDB=		${TOOLDIR}/bin/${_TOOL_PREFIX}cap_mkdb
 TOOL_CAT=		${TOOLDIR}/bin/${_TOOL_PREFIX}cat
 TOOL_CKSUM=		${TOOLDIR}/bin/${_TOOL_PREFIX}cksum
@@ -225,7 +223,9 @@ TOOL_CONFIG=		${TOOLDIR}/bin/${_TOOL_PREFIX}config
 TOOL_CRUNCHGEN=		MAKE=${.MAKE:Q} ${TOOLDIR}/bin/${_TOOL_PREFIX}crunchgen
 TOOL_CTAGS=		${TOOLDIR}/bin/${_TOOL_PREFIX}ctags
 TOOL_DB=		${TOOLDIR}/bin/${_TOOL_PREFIX}db
+TOOL_DISKLABEL=		${TOOLDIR}/bin/nbdisklabel-${MAKEWRAPPERMACHINE}
 TOOL_EQN=		${TOOLDIR}/bin/${_TOOL_PREFIX}eqn
+TOOL_FDISK=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-fdisk
 TOOL_FGEN=		${TOOLDIR}/bin/${_TOOL_PREFIX}fgen
 TOOL_GENASSYM=		${TOOLDIR}/bin/${_TOOL_PREFIX}genassym
 TOOL_GENCAT=		${TOOLDIR}/bin/${_TOOL_PREFIX}gencat
@@ -244,8 +244,6 @@ TOOL_MAKEFS=		${TOOLDIR}/bin/${_TOOL_PREFIX}makefs
 TOOL_MAKEINFO=		${TOOLDIR}/bin/${_TOOL_PREFIX}makeinfo
 TOOL_MAKEWHATIS=	${TOOLDIR}/bin/${_TOOL_PREFIX}makewhatis
 TOOL_MDSETIMAGE=	${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-mdsetimage
-TOOL_DISKLABEL=		${TOOLDIR}/bin/nbdisklabel-${MAKEWRAPPERMACHINE}
-TOOL_FDISK=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-fdisk
 TOOL_MENUC=		MENUDEF=${TOOLDIR}/share/misc ${TOOLDIR}/bin/${_TOOL_PREFIX}menuc
 TOOL_MIPSELF2ECOFF=	${TOOLDIR}/bin/${_TOOL_PREFIX}mips-elf2ecoff
 TOOL_MKCSMAPPER=	${TOOLDIR}/bin/${_TOOL_PREFIX}mkcsmapper
@@ -268,8 +266,8 @@ TOOL_ROFF_RAW=		${TOOL_GROFF} -Z
 TOOL_RPCGEN=		RPCGEN_CPP=${CPP:Q} ${TOOLDIR}/bin/${_TOOL_PREFIX}rpcgen
 TOOL_SED=		${TOOLDIR}/bin/${_TOOL_PREFIX}sed
 TOOL_SOELIM=		${TOOLDIR}/bin/${_TOOL_PREFIX}soelim
-TOOL_STAT=		${TOOLDIR}/bin/${_TOOL_PREFIX}stat
 TOOL_SPARKCRC=		${TOOLDIR}/bin/${_TOOL_PREFIX}sparkcrc
+TOOL_STAT=		${TOOLDIR}/bin/${_TOOL_PREFIX}stat
 TOOL_STRFILE=		${TOOLDIR}/bin/${_TOOL_PREFIX}strfile
 TOOL_SUNLABEL=		${TOOLDIR}/bin/${_TOOL_PREFIX}sunlabel
 TOOL_TBL=		${TOOLDIR}/bin/${_TOOL_PREFIX}tbl
@@ -277,7 +275,75 @@ TOOL_UUDECODE=		${TOOLDIR}/bin/${_TOOL_PREFIX}uudecode
 TOOL_VGRIND=		${TOOLDIR}/bin/${_TOOL_PREFIX}vgrind -f
 TOOL_ZIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}zic
 
-.endif	# USETOOLS == yes						# }
+.else	# USETOOLS != yes						# } {
+
+TOOL_AMIGAAOUT2BB=	amiga-aout2bb
+TOOL_AMIGAELF2BB=	amiga-elf2bb
+TOOL_AMIGATXLT=		amiga-txlt
+TOOL_ASN1_COMPILE=	asn1_compile
+TOOL_ATF_COMPILE=	atf-compile
+TOOL_AWK=		awk
+TOOL_CAP_MKDB=		cap_mkdb
+TOOL_CAT=		cat
+TOOL_CKSUM=		cksum
+TOOL_COMPILE_ET=	compile_et
+TOOL_CONFIG=		config
+TOOL_CRUNCHGEN=		crunchgen
+TOOL_CTAGS=		ctags
+TOOL_DB=		db
+TOOL_DISKLABEL=		disklabel
+TOOL_EQN=		eqn
+TOOL_FDISK=		fdisk
+TOOL_FGEN=		fgen
+TOOL_GENASSYM=		genassym
+TOOL_GENCAT=		gencat
+TOOL_GMAKE=		gmake
+TOOL_GROFF=		groff
+TOOL_HEXDUMP=		hexdump
+TOOL_HP300MKBOOT=	hp300-mkboot
+TOOL_HP700MKBOOT=	hp700-mkboot
+TOOL_INDXBIB=		indxbib
+TOOL_INSTALLBOOT=	installboot
+TOOL_INSTALL_INFO=	install-info
+TOOL_JOIN=		join
+TOOL_M4=		m4
+TOOL_MACPPCFIXCOFF=	macppc-fixcoff
+TOOL_MAKEFS=		makefs
+TOOL_MAKEINFO=		makeinfo
+TOOL_MAKEWHATIS=	/usr/libexec/makewhatis
+TOOL_MDSETIMAGE=	mdsetimage
+TOOL_MENUC=		menuc
+TOOL_MIPSELF2ECOFF=	mips-elf2ecoff
+TOOL_MKCSMAPPER=	mkcsmapper
+TOOL_MKESDB=		mkesdb
+TOOL_MKLOCALE=		mklocale
+TOOL_MKMAGIC=		file
+TOOL_MKTEMP=		mktemp
+TOOL_MSGC=		msgc
+TOOL_MTREE=		mtree
+TOOL_PAX=		pax
+TOOL_PIC=		pic
+TOOL_POWERPCMKBOOTIMAGE=	powerpc-mkbootimage
+TOOL_PWD_MKDB=		pwd_mkdb
+TOOL_REFER=		refer
+TOOL_ROFF_ASCII=	nroff
+TOOL_ROFF_DVI=		${TOOL_GROFF} -Tdvi
+TOOL_ROFF_HTML=		${TOOL_GROFF} -Tlatin1 -mdoc2html
+TOOL_ROFF_PS=		${TOOL_GROFF} -Tps
+TOOL_ROFF_RAW=		${TOOL_GROFF} -Z
+TOOL_RPCGEN=		rpcgen
+TOOL_SED=		sed
+TOOL_SOELIM=		soelim
+TOOL_SPARKCRC=		sparkcrc
+TOOL_STAT=		stat
+TOOL_STRFILE=		strfile
+TOOL_SUNLABEL=		sunlabel
+TOOL_TBL=		tbl
+TOOL_UUDECODE=		uudecode
+TOOL_VGRIND=		vgrind -f
+TOOL_ZIC=		zic
+
+.endif	# USETOOLS != yes						# }
 
 #
 # Targets to check if DESTDIR or RELEASEDIR is provided
@@ -539,7 +605,7 @@ dependall:	.NOTMAIN realdepend .MAKE
 # including bsd.own.mk.
 #
 .for var in \
-	NOCRYPTO NODOC NOHTML NOLINKLIB NOLINT NOMAN NONLS NOOBJ NOPIC \
+	NOCRYPTO NODOC NOHTML NOINFO NOLINKLIB NOLINT NOMAN NONLS NOOBJ NOPIC \
 	NOPICINSTALL NOPROFILE NOSHARE NOSTATICLIB
 .if defined(${var})
 MK${var:S/^NO//}:=	no
@@ -554,6 +620,16 @@ MK${var:S/^NO//}:=	no
 MK${var}:=	yes
 .endif
 .endfor
+
+#
+# MK* options which have variable defaults.
+#
+.if ${MACHINE} == "amd64" || ${MACHINE} == "sparc64"
+MKCOMPAT?=	yes
+.else
+# Don't let this build where it really isn't supported.
+MKCOMPAT:=	no
+.endif
 
 #
 # MK* options which default to "yes".
@@ -573,6 +649,7 @@ MK${var}:=	yes
 	MKOBJ \
 	MKPAM \
 	MKPF MKPIC MKPICINSTALL MKPICLIB MKPOSTFIX MKPROFILE \
+	MKPUFFS \
 	MKSHARE MKSKEY MKSTATICLIB \
 	MKYP
 ${var}?=	yes
@@ -585,7 +662,7 @@ ${var}?=	yes
 	MKCRYPTO_IDEA MKCRYPTO_MDC2 MKCRYPTO_RC5 MKDEBUG MKDEBUGLIB \
 	MKMANZ MKMODULAR MKOBJDIRS \
 	MKPCC MKPCCCMDS \
-	MKPUFFS MKSOFTFLOAT MKSTRIPIDENT \
+	MKSOFTFLOAT MKSTRIPIDENT \
 	MKUNPRIVED MKUPDATE MKX11 MKXORG
 ${var}?=no
 .endfor
@@ -776,9 +853,10 @@ X11SRCDIR.xf86-input-${_i}?=	${X11SRCDIRMIT}/xf86-input-${_i}/dist
 
 .for _v in \
 	apm ark ast ati chips cirrus cyrix glint i128 i740 imstt intel \
-	mach64 mga neomagic nsc nv nvxbox radeonhd rendition \
+	mach64 mga neomagic nsc nv nvxbox r128 radeonhd rendition \
 	s3 s3virge savage \
-	siliconmotion sis tdfx tga trident tseng vesa vga via vmware wsfb
+	siliconmotion sis sunffb suncg6 tdfx tga trident tseng vesa vga via \
+	vmware wsfb
 X11SRCDIR.xf86-video-${_v}?=	${X11SRCDIRMIT}/xf86-video-${_v}/dist
 .endfor
 

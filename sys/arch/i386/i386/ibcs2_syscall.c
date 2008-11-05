@@ -1,4 +1,4 @@
-/*	$NetBSD: ibcs2_syscall.c,v 1.41 2008/04/28 20:23:24 martin Exp $	*/
+/*	$NetBSD: ibcs2_syscall.c,v 1.44 2008/10/21 12:16:59 ad Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ibcs2_syscall.c,v 1.41 2008/04/28 20:23:24 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ibcs2_syscall.c,v 1.44 2008/10/21 12:16:59 ad Exp $");
 
 #if defined(_KERNEL_OPT)
 #include "opt_vm86.h"
@@ -42,6 +42,7 @@ __KERNEL_RCSID(0, "$NetBSD: ibcs2_syscall.c,v 1.41 2008/04/28 20:23:24 martin Ex
 #include <sys/user.h>
 #include <sys/signal.h>
 #include <sys/syscall.h>
+#include <sys/syscallvar.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -117,7 +118,7 @@ ibcs2_syscall_plain(frame)
 	rval[0] = 0;
 	rval[1] = 0;
 
-	error = (*callp->sy_call)(l, args, rval);
+	error = sy_call(callp, l, args, rval);
 
 	switch (error) {
 	case 0:
@@ -196,7 +197,7 @@ ibcs2_syscall_fancy(frame)
 	if ((error = trace_enter(code, args, callp->sy_narg)) == 0) {
 		rval[0] = 0;
 		rval[1] = 0;
-		error = (*callp->sy_call)(l, args, rval);
+		error = sy_call(callp, l, args, rval);
 	}
 
 	switch (error) {

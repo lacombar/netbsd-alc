@@ -1,4 +1,4 @@
-/*	$NetBSD: linux_exec.c,v 1.105 2008/04/28 20:23:43 martin Exp $	*/
+/*	$NetBSD: linux_exec.c,v 1.108 2008/10/28 11:42:30 jmcneill Exp $	*/
 
 /*-
  * Copyright (c) 1994, 1995, 1998, 2000, 2007, 2008 The NetBSD Foundation, Inc.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.105 2008/04/28 20:23:43 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: linux_exec.c,v 1.108 2008/10/28 11:42:30 jmcneill Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -123,6 +123,7 @@ const struct emul emul_linux = {
 	uvm_default_mapaddr,
 
 	linux_usertrap,
+	NULL,		/* e_sa */
 	0,
 	NULL,		/* e_startlwp */
 };
@@ -151,6 +152,7 @@ linux_e_proc_init(p, parent, forkflags)
 	memset(e, '\0', sizeof(struct linux_emuldata));
 
 	e->proc = p;
+	e->robust_futexes = NULL;
 
 	if (parent)
 		ep = parent->p_emuldata;
@@ -244,6 +246,7 @@ linux_e_proc_exit(struct proc *p)
 
 #ifdef LINUX_NPTL
 	linux_nptl_proc_exit(p);
+	release_futexes(p);
 #endif
 
 	/* Remove the thread for the group thread list */

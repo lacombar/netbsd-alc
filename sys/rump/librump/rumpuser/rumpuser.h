@@ -1,4 +1,4 @@
-/*	$NetBSD: rumpuser.h,v 1.22 2008/08/08 13:57:59 pooka Exp $	*/
+/*	$NetBSD: rumpuser.h,v 1.27 2008/10/30 01:54:25 christos Exp $	*/
 
 /*
  * Copyright (c) 2007 Antti Kantee.  All Rights Reserved.
@@ -31,6 +31,12 @@
 #define _RUMP_RUMPUSER_H_
 
 struct stat;
+struct msghdr;
+struct pollfd;
+struct iovec;
+struct timespec;
+struct timeval;
+struct sockaddr;
 
 int rumpuser_stat(const char *, struct stat *, int *);
 int rumpuser_lstat(const char *, struct stat *, int *);
@@ -50,8 +56,10 @@ int rumpuser_fsync(int, int *);
 
 ssize_t rumpuser_read(int, void *, size_t, int *);
 ssize_t rumpuser_pread(int, void *, size_t, off_t, int *);
+ssize_t rumpuser_readv(int, const struct iovec *, int, int *);
 ssize_t rumpuser_write(int, const void *, size_t, int *);
 ssize_t rumpuser_pwrite(int, const void *, size_t, off_t, int *);
+ssize_t rumpuser_writev(int, const struct iovec *, int, int *);
 void rumpuser_read_bio(int, void *, size_t, off_t, void *);
 void rumpuser_write_bio(int, const void *, size_t, off_t, void *);
 
@@ -66,7 +74,7 @@ int rumpuser_gethostname(char *, size_t, int *);
 
 char *rumpuser_realpath(const char *, char *, int *);
 
-void rumpuser_yield(void);
+int rumpuser_poll(struct pollfd *, int, int, int *);
 
 /* rumpuser_pth */
 
@@ -139,5 +147,12 @@ extern struct rumpuser_rw rumpspl;
 void rumpuser_set_ipl(int);
 int  rumpuser_whatis_ipl(void);
 void rumpuser_clear_ipl(int);
+
+/* rumpuser_net */
+
+int  rumpuser_net_socket(int, int, int, int *);
+int  rumpuser_net_sendmsg(int, const struct msghdr *, int, int *);
+int  rumpuser_net_recvmsg(int, struct msghdr *, int, int *);
+int  rumpuser_net_connect(int, const struct sockaddr *, int, int *);
 
 #endif /* _RUMP_RUMPUSER_H_ */

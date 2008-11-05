@@ -1,4 +1,4 @@
-/*	$NetBSD: ipmi.c,v 1.20 2008/09/23 10:17:06 ad Exp $ */
+/*	$NetBSD: ipmi.c,v 1.25 2008/11/03 22:44:42 christos Exp $ */
 /*
  * Copyright (c) 2006 Manuel Bouyer.
  *
@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ipmi.c,v 1.20 2008/09/23 10:17:06 ad Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ipmi.c,v 1.25 2008/11/03 22:44:42 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -100,7 +100,7 @@ int	ipmi_enabled = 0;
 
 #define SMBIOS_TYPE_IPMI	0x26
 
-#define DEVNAME(s)  (device_xname(&((s)->sc_dev)))
+#define DEVNAME(s)  (device_xname((s)->sc_dev))
 
 /*
  * Format of SMBIOS IPMI Flags
@@ -186,8 +186,8 @@ int	ipmi_watchdog_setmode(struct sysmon_wdog *);
 int	ipmi_watchdog_tickle(struct sysmon_wdog *);
 
 int	ipmi_intr(void *);
-int	ipmi_match(struct device *, struct cfdata *, void *);
-void	ipmi_attach(struct device *, struct device *, void *);
+int	ipmi_match(device_t, cfdata_t, void *);
+void	ipmi_attach(device_t, device_t, void *);
 
 long	ipow(long, int);
 long	ipmi_convert(uint8_t, struct sdrtype1 *, long);
@@ -317,7 +317,7 @@ bmc_io_wait(struct ipmi_softc *sc, int offset, uint8_t mask, uint8_t value,
 	struct ipmi_bmc_args	args;
 
 	u = bmc_io_wait_spin(sc, offset, mask, value, lbl);
-	if (u != -1)
+	if (cold || u != -1)
 		return u;
 
 	sc->sc_retries = 0;
@@ -348,7 +348,8 @@ bmc_io_wait_spin(struct ipmi_softc *sc, int offset, uint8_t mask,
     uint8_t value, const char *lbl)
 {
 	volatile uint8_t	v;
-	int			count = 500; /* ~us */
+	int			count = cold ? 5000 : 500;
+	/* ~us */
 
 	while (count--) {
 		v = bmc_read(sc, offset);
@@ -1702,44 +1703,50 @@ ipmi_probe(struct ipmi_attach_args *ia)
 }
 
 int
-ipmi_match(struct device *parent, struct cfdata *cf,
-    void *aux)
+ipmi_match(device_t parent, cfdata_t cf, void *aux)
 {
-	struct ipmi_softc	sc;
+	struct ipmi_softc sc;
+	struct device dev;
 	struct ipmi_attach_args *ia = aux;
 	uint8_t		cmd[32];
 	int			len;
 	int			rv = 0;
 
+	/* functions called below access this field in their error path
+	 * via the DEVNAME macro. So initialize this. */
+	strlcpy(dev.dv_xname, "ipmiX", sizeof(dev.dv_xname));
+	sc.sc_dev = &dev;
+
 	/* Map registers */
-	if (ipmi_map_regs(&sc, ia) == 0) {
-		sc.sc_if->probe(&sc);
+	if (ipmi_map_regs(&sc, ia) != 0)
+		return 0;
 
-		/* Identify BMC device early to detect lying bios */
-		if (ipmi_sendcmd(&sc, BMC_SA, 0, APP_NETFN, APP_GET_DEVICE_ID,
-		    0, NULL)) {
-			dbg_printf(1, ": unable to send get device id "
-			    "command\n");
-			goto unmap;
-		}
-		if (ipmi_recvcmd(&sc, sizeof(cmd), &len, cmd)) {
-			dbg_printf(1, ": unable to retrieve device id\n");
-			goto unmap;
-		}
+	sc.sc_if->probe(&sc);
 
-		dbg_dump(1, "bmc data", len, cmd);
-		rv = 1; /* GETID worked, we got IPMI */
-unmap:
-		ipmi_unmap_regs(&sc, ia);
+	/* Identify BMC device early to detect lying bios */
+	if (ipmi_sendcmd(&sc, BMC_SA, 0, APP_NETFN, APP_GET_DEVICE_ID,
+	    0, NULL)) {
+		dbg_printf(1, ": unable to send get device id "
+		    "command\n");
+		goto unmap;
+	}
+	if (ipmi_recvcmd(&sc, sizeof(cmd), &len, cmd)) {
+		dbg_printf(1, ": unable to retrieve device id\n");
+		goto unmap;
 	}
 
-	return (rv);
+	dbg_dump(1, "bmc data", len, cmd);
+	rv = 1; /* GETID worked, we got IPMI */
+unmap:
+	ipmi_unmap_regs(&sc, ia);
+
+	return rv;
 }
 
 static void
 ipmi_attach2(device_t self)
 {
-	struct ipmi_softc	*sc = (void *) self;
+	struct ipmi_softc	*sc = device_private(self);
 	struct ipmi_attach_args *ia = &sc->sc_ia;
 	uint16_t		rec;
 	struct ipmi_sensor *ipmi_s;
@@ -1847,11 +1854,12 @@ ipmi_attach2(device_t self)
 }
 
 void
-ipmi_attach(struct device *parent, struct device *self, void *aux)
+ipmi_attach(device_t parent, device_t self, void *aux)
 {
-	struct ipmi_softc	*sc = (void *) self;
+	struct ipmi_softc	*sc = device_private(self);
 
 	sc->sc_ia = *(struct ipmi_attach_args *)aux;
+	sc->sc_dev = self;
 	aprint_normal("\n");
 	config_interrupts(self, ipmi_attach2);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: init_main.c,v 1.363 2008/08/30 09:20:13 reinoud Exp $	*/
+/*	$NetBSD: init_main.c,v 1.371 2008/10/28 15:33:10 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 2008 The NetBSD Foundation, Inc.
@@ -97,8 +97,9 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: init_main.c,v 1.363 2008/08/30 09:20:13 reinoud Exp $");
+__KERNEL_RCSID(0, "$NetBSD: init_main.c,v 1.371 2008/10/28 15:33:10 tsutsui Exp $");
 
+#include "opt_ddb.h"
 #include "opt_ipsec.h"
 #include "opt_ntp.h"
 #include "opt_pipe.h"
@@ -125,7 +126,6 @@ __KERNEL_RCSID(0, "$NetBSD: init_main.c,v 1.363 2008/08/30 09:20:13 reinoud Exp 
 #include <sys/callout.h>
 #include <sys/cpu.h>
 #include <sys/kernel.h>
-#include <sys/kmem.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/kthread.h>
@@ -162,6 +162,9 @@ __KERNEL_RCSID(0, "$NetBSD: init_main.c,v 1.363 2008/08/30 09:20:13 reinoud Exp 
 #include <sys/module.h>
 #include <sys/event.h>
 #include <sys/lockf.h>
+#include <sys/once.h>
+#include <sys/ksyms.h>
+#include <sys/uidinfo.h>
 #ifdef FAST_IPSEC
 #include <netipsec/ipsec.h>
 #endif
@@ -335,10 +338,9 @@ main(void)
 	consinit();
 
 	kernel_lock_init();
+	once_init();
 
 	uvm_init();
-
-	kmem_init();
 
 	percpu_init();
 
@@ -804,18 +806,34 @@ start_init(void *arg)
 				printf(" (default %s)", initpaths[ipx]);
 			printf(": ");
 			len = cngetsn(ipath, sizeof(ipath)-1);
-			if (len == 0) {
-				if (initpaths[ipx])
-					path = initpaths[ipx++];
-				else
-					continue;
-			} else {
+			if (len == 4 && strcmp(ipath, "halt") == 0) {
+				cpu_reboot(RB_HALT, NULL);
+			} else if (len == 6 && strcmp(ipath, "reboot") == 0) {
+				cpu_reboot(0, NULL);
+#if defined(DDB)
+			} else if (len == 3 && strcmp(ipath, "ddb") == 0) {
+				console_debugger();
+				continue;
+#endif
+			} else if (len > 0 && ipath[0] == '/') {
 				ipath[len] = '\0';
 				path = ipath;
+			} else if (len == 0 && initpaths[ipx] != NULL) {
+				path = initpaths[ipx++];
+			} else {
+				printf("use absolute path, ");
+#if defined(DDB)
+				printf("\"ddb\", ");
+#endif
+				printf("\"halt\", or \"reboot\"\n");
+				continue;
 			}
 		} else {
-			if ((path = initpaths[ipx++]) == NULL)
-				break;
+			if ((path = initpaths[ipx++]) == NULL) {
+				ipx = 0;
+				boothowto |= RB_ASKNAME;
+				continue;
+			}
 		}
 
 		ucp = (char *)USRSTACK;

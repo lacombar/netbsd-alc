@@ -1,4 +1,4 @@
-/* $NetBSD: syscall.c,v 1.32 2008/04/28 20:23:10 martin Exp $ */
+/* $NetBSD: syscall.c,v 1.34 2008/10/21 12:16:58 ad Exp $ */
 
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -89,14 +89,19 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: syscall.c,v 1.32 2008/04/28 20:23:10 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: syscall.c,v 1.34 2008/10/21 12:16:58 ad Exp $");
+
+#include "opt_sa.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/sa.h>
+#include <sys/savar.h>
 #include <sys/user.h>
 #include <sys/signal.h>
 #include <sys/syscall.h>
+#include <sys/syscallvar.h>
 #include <sys/ktrace.h>
 
 #include <uvm/uvm_extern.h>
@@ -149,6 +154,12 @@ syscall_plain(struct lwp *l, u_int64_t code, struct trapframe *framep)
 
 	callp = p->p_emul->e_sysent;
 
+#ifdef KERN_SA
+	if (__predict_false((l->l_savp)
+            && (l->l_savp->savp_pflags & SAVP_FLAG_DELIVERING)))
+		l->l_savp->savp_pflags &= ~SAVP_FLAG_DELIVERING;
+#endif
+
 	switch (code) {
 	case SYS_syscall:
 	case SYS___syscall:
@@ -197,7 +208,7 @@ syscall_plain(struct lwp *l, u_int64_t code, struct trapframe *framep)
 	rval[0] = 0;
 	rval[1] = 0;
 
-	error = (*callp->sy_call)(l, args, rval);
+	error = sy_call(callp, l, args, rval);
 
 	switch (error) {
 	case 0:
@@ -236,6 +247,12 @@ syscall_fancy(struct lwp *l, u_int64_t code, struct trapframe *framep)
 	l->l_md.md_tf = framep;
 
 	callp = p->p_emul->e_sysent;
+
+#ifdef KERN_SA
+	if (__predict_false((l->l_savp)
+            && (l->l_savp->savp_pflags & SAVP_FLAG_DELIVERING)))
+		l->l_savp->savp_pflags &= ~SAVP_FLAG_DELIVERING;
+#endif
 
 	switch (code) {
 	case SYS_syscall:
@@ -287,7 +304,7 @@ syscall_fancy(struct lwp *l, u_int64_t code, struct trapframe *framep)
 	if ((error = trace_enter(code, args, callp->sy_narg)) == 0) {
 		rval[0] = 0;
 		rval[1] = 0;
-		error = (*callp->sy_call)(l, args, rval);
+		error = sy_call(callp, l, args, rval);
 	}
 
 	switch (error) {

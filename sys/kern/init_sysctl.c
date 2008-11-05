@@ -1,4 +1,4 @@
-/*	$NetBSD: init_sysctl.c,v 1.144 2008/07/15 22:25:30 christos Exp $ */
+/*	$NetBSD: init_sysctl.c,v 1.149 2008/10/22 11:25:19 ad Exp $ */
 
 /*-
  * Copyright (c) 2003, 2007, 2008 The NetBSD Foundation, Inc.
@@ -30,11 +30,11 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.144 2008/07/15 22:25:30 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.149 2008/10/22 11:25:19 ad Exp $");
 
 #include "opt_sysv.h"
-#include "opt_posix.h"
 #include "opt_compat_netbsd32.h"
+#include "opt_sa.h"
 #include "pty.h"
 #include "rnd.h"
 
@@ -66,6 +66,7 @@ __KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.144 2008/07/15 22:25:30 christos E
 #include <sys/stat.h>
 #include <sys/kauth.h>
 #include <sys/ktrace.h>
+#include <sys/ksem.h>
 
 #include <miscfs/specfs/specdev.h>
 
@@ -73,9 +74,13 @@ __KERNEL_RCSID(0, "$NetBSD: init_sysctl.c,v 1.144 2008/07/15 22:25:30 christos E
 #include <compat/netbsd32/netbsd32.h>
 #endif
 
+#ifdef KERN_SA
+#include <sys/sa.h>
+#endif
+
 #include <sys/cpu.h>
 
-/* XXX this should not be here */
+int posix_semaphores;
 int security_setidcore_dump;
 char security_setidcore_path[MAXPATHLEN] = "/var/crash/%n.core";
 uid_t security_setidcore_owner = 0;
@@ -125,6 +130,7 @@ static const u_int sysctl_lwpflagmap[] = {
 	LW_INMEM, P_INMEM,
 	LW_SINTR, P_SINTR,
 	LW_SYSTEM, P_SYSTEM,
+	LW_SA, P_SA,	/* WRS ??? */
 	0
 };
 
@@ -695,17 +701,13 @@ SYSCTL_SETUP(sysctl_kern_setup, "sysctl kern subtree setup")
 		       NULL, _POSIX_THREADS, NULL, 0,
 		       CTL_KERN, KERN_POSIX_THREADS, CTL_EOL);
 	sysctl_createv(clog, 0, NULL, NULL,
-		       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
+		       CTLFLAG_PERMANENT,
 		       CTLTYPE_INT, "posix_semaphores",
 		       SYSCTL_DESCR("Version of IEEE Std 1003.1 and its "
 				    "Semaphores option to which the system "
 				    "attempts to conform"), NULL,
-#ifdef P1003_1B_SEMAPHORE
-		       200112,
-#else /* P1003_1B_SEMAPHORE */
-		       0,
-#endif /* P1003_1B_SEMAPHORE */
-		       NULL, 0, CTL_KERN, KERN_POSIX_SEMAPHORES, CTL_EOL);
+		       0, &posix_semaphores,
+		       0, CTL_KERN, KERN_POSIX_SEMAPHORES, CTL_EOL);
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
 		       CTLTYPE_INT, "posix_barriers",
@@ -829,12 +831,21 @@ SYSCTL_SETUP(sysctl_kern_setup, "sysctl kern subtree setup")
 		       sysctl_security_setidcore, 0, &security_setidcore_mode,
 		       0,
 		       CTL_CREATE, CTL_EOL);
+#ifdef KERN_SA
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "no_sa_support",
+		       SYSCTL_DESCR("0 if the kernel supports SA, otherwise it doesn't"),
+		       NULL, 0, &sa_system_disabled, 0,
+		       CTL_KERN, CTL_CREATE, CTL_EOL);
+#else
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT|CTLFLAG_IMMEDIATE,
 		       CTLTYPE_INT, "no_sa_support",
 		       SYSCTL_DESCR("0 if the kernel supports SA, otherwise it doesn't"),
 		       NULL, 1, NULL, 0,
 		       CTL_KERN, CTL_CREATE, CTL_EOL);
+#endif
 }
 
 SYSCTL_SETUP(sysctl_kern_proc_setup,
@@ -2866,6 +2877,39 @@ sysctl_consdev(SYSCTLFN_ARGS)
  * section 4: support for some helpers
  * ********************************************************************
  */
+/*
+ * Find the most ``active'' lwp of a process and return it for ps display
+ * purposes
+ */
+static struct lwp *
+proc_active_lwp(struct proc *p)
+{
+	static const int ostat[] = {
+		0,	
+		2,	/* LSIDL */
+		6,	/* LSRUN */
+		5,	/* LSSLEEP */
+		4,	/* LSSTOP */
+		0,	/* LSZOMB */
+		1,	/* LSDEAD */
+		7,	/* LSONPROC */
+		3	/* LSSUSPENDED */
+	};
+
+	struct lwp *l, *lp = NULL;
+	LIST_FOREACH(l, &p->p_lwps, l_sibling) {
+		KASSERT(l->l_stat >= 0 && l->l_stat < __arraycount(ostat));
+		if (lp == NULL ||
+		    ostat[l->l_stat] > ostat[lp->l_stat] ||
+		    (ostat[l->l_stat] == ostat[lp->l_stat] &&
+		    l->l_cpticks > lp->l_cpticks)) {
+			lp = l;
+			continue;
+		}
+	}
+	return lp;
+}
+
 
 /*
  * Fill in a kinfo_proc2 structure for the specified process.
@@ -2954,7 +2998,7 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki, bool zombie)
 		ki->p_vm_ssize = vm->vm_ssize;
 
 		/* Pick the primary (first) LWP */
-		l = LIST_FIRST(&p->p_lwps);
+		l = proc_active_lwp(p);
 		KASSERT(l != NULL);
 		lwp_lock(l);
 		ki->p_nrlwps = p->p_nrlwps;
@@ -3124,7 +3168,7 @@ fill_eproc(struct proc *p, struct eproc *ep, bool zombie)
 		ep->e_vm.vm_ssize = vm->vm_ssize;
 
 		/* Pick the primary (first) LWP */
-		l = LIST_FIRST(&p->p_lwps);
+		l = proc_active_lwp(p);
 		KASSERT(l != NULL);
 		lwp_lock(l);
 		if (l->l_wchan)

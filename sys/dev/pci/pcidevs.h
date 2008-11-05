@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs.h,v 1.961 2008/10/01 17:16:15 christos Exp $	*/
+/*	$NetBSD: pcidevs.h,v 1.965 2008/11/04 13:23:41 cegger Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.960 2008/10/01 15:38:14 christos Exp
+ *	NetBSD: pcidevs,v 1.964 2008/11/04 13:22:29 cegger Exp
  */
 
 /*
@@ -1297,6 +1297,35 @@
 #define	PCI_PRODUCT_ATI_RADEON_RV280_5963	0x5963		/* Radeon 9200 5963 */
 #define	PCI_PRODUCT_ATI_RADEON_RV280_5964	0x5964		/* Radeon 9200SE 5964 */
 #define	PCI_PRODUCT_ATI_RS482M	0x5975		/* Radeon Xpress Series (RS482M) */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GFX0_A	0x5978		/* RD790 PCI Bridge GFX0 Port A */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GFX0_B	0x5979		/* RD790 PCI Bridge GFX0 Port B */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GPP_A	0x597a		/* RD790 PCI Express Bridge GPP Port A */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GPP_B	0x597b		/* RD790 PCI Express Bridge GPP Port B */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GPP_C	0x597c		/* RD790 PCI Express Bridge GPP Port C */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GPP_D	0x597d		/* RD790 PCI Express Bridge GPP Port D */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GPP_E	0x597e		/* RD790 PCI Express Bridge GPP Port E */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GPP_F	0x597f		/* RD790 PCI Express Bridge GPP Port F */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GFX1_A	0x5980		/* RD790 PCI Bridge GFX1 Port A */
+#define	PCI_PRODUCT_ATI_RD790_PPB_GFX1_B	0x5981		/* RD790 PCI Bridge GFX1 Port B */
+#define	PCI_PRODUCT_ATI_RD790_PPB_NBSB	0x5982		/* RD790 PCI Bridge (NB-SB link) */
+#define	PCI_PRODUCT_ATI_RD890_NB_DS16	0x5910		/* RD890 Northbridge Dual Slot 2x16 GFX */
+#define	PCI_PRODUCT_ATI_RD890_NB_SS	0x5911		/* RD890 Northbridge Single Slot GFX */
+#define	PCI_PRODUCT_ATI_RD890_NB_DS8	0x5912		/* RD890 Northbridge Dual Slot 2x8 GFX */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GFX0_A	0x5913		/* RD890 PCI Bridge GFX0 Port A */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GFX0_B	0x5914		/* RD890 PCI Bridge GFX0 Port B */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_A	0x5915		/* RD890 PCI Express Bridge GPP Port A */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_B	0x5916		/* RD890 PCI Express Bridge GPP Port B */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_C	0x5917		/* RD890 PCI Express Bridge GPP Port C */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_D	0x5918		/* RD890 PCI Express Bridge GPP Port D */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_E	0x5919		/* RD890 PCI Express Bridge GPP Port E */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_F	0x591a		/* RD890 PCI Express Bridge GPP Port F */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_G	0x591b		/* RD890 PCI Express Bridge GPP Port G */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GPP_H	0x591c		/* RD890 PCI Express Bridge GPP Port H */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GFX1_A	0x591d		/* RD890 PCI Bridge GFX1 Port A */
+#define	PCI_PRODUCT_ATI_RD890_PPB_GFX1_B	0x591e		/* RD890 PCI Bridge GFX1 Port B */
+#define	PCI_PRODUCT_ATI_RD890_PPB_NBSB	0x591f		/* RD890 PCI Bridge (NB-SB link) */
+#define	PCI_PRODUCT_ATI_RD890_IOMMU	0x5a23		/* RD890 IOMMU */
+#define	PCI_PRODUCT_ATI_RADEON_XPRESS_200	0x5a33		/* Radeon Xpress 200 */
 #define	PCI_PRODUCT_ATI_RS480_XRP	0x5a34		/* RS480 PCI Express Root Port */
 #define	PCI_PRODUCT_ATI_RS480_PPB_5A36	0x5a36		/* RS480 PCI Express Bridge */
 #define	PCI_PRODUCT_ATI_RS480_PPB_5A37	0x5a37		/* RS480 PCI Express Bridge */
@@ -2209,12 +2238,15 @@
 #define	PCI_PRODUCT_INTEL_80K3LAN_SDS_SPT	0x10bb		/* i80003 Gigabit Ethernet (SERDES) */
 #define	PCI_PRODUCT_INTEL_82571GB_QUAD_COPPER	0x10bc		/* i82571GB quad 1000baseT Ethernet */
 #define	PCI_PRODUCT_INTEL_82801I_IGP_AMT	0x10bd		/* 82801I (AMT) LAN Controller */
+#define	PCI_PRODUCT_INTEL_82801I_IGP_M	0x10bf		/* 82801I mobile LAN controller */
 #define	PCI_PRODUCT_INTEL_82801I_IFE	0x10c0		/* 82801I LAN Controller */
 #define	PCI_PRODUCT_INTEL_82801I_IFE_G	0x10c2		/* 82801I (G) LAN Controller */
 #define	PCI_PRODUCT_INTEL_82801I_IFE_GT	0x10c3		/* 82801I (GT) LAN Controller */
 #define	PCI_PRODUCT_INTEL_82801H_IFE_GT	0x10c4		/* i82801H IFE (GT) LAN Controller */
 #define	PCI_PRODUCT_INTEL_82801H_IFE_G	0x10c5		/* i82801H IFE (G) LAN Controller */
+#define	PCI_PRODUCT_INTEL_82801H_IGP_M_V	0x10cb		/* i82801H IGP (MV) LAN Controller */
 #define	PCI_PRODUCT_INTEL_82567V	0x10ce		/* i82567V LAN controller */
+#define	PCI_PRODUCT_INTEL_82801I_IGP_M_AMT	0x10f5		/* 82801I mobile (AMT) LAN controller */
 #define	PCI_PRODUCT_INTEL_82815_DC100_HUB	0x1100		/* 82815 Hub */
 #define	PCI_PRODUCT_INTEL_82815_DC100_AGP	0x1101		/* 82815 AGP */
 #define	PCI_PRODUCT_INTEL_82815_DC100_GRAPH	0x1102		/* 82815 Graphics */
