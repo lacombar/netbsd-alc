@@ -339,7 +339,7 @@ void *		_prop_standalone_realloc(void *, size_t);
 
 #define	_PROP_MALLOC_DEFINE(t, s, l)	/* nothing */
 
-#if defined(__NetBSD__) && defined(_LIBPROP)
+#if defined(__NetBSD__) && defined(_LIBPROP) && defined(_REENTRANT)
 /*
  * Use the same mechanism as libc; we get pthread mutexes for threaded
  * programs and do-nothing stubs for non-threaded programs.
