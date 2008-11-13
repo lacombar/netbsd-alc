@@ -115,6 +115,9 @@ static _prop_object_equals_rv_t
 				        void **, void **,
 					prop_object_t *, prop_object_t *);
 static void	_prop_dictionary_equals_finish(prop_object_t, prop_object_t);
+#ifdef _PROP_MEMSTAT
+static bool _prop_dictionary_memstat(prop_object_t, size_t *);
+#endif
 static prop_object_iterator_t
 		_prop_dictionary_iterator_locked(prop_dictionary_t);
 static prop_object_t
@@ -132,6 +135,9 @@ static const struct _prop_object_type _prop_object_type_dictionary = {
 	.pot_extern		=	_prop_dictionary_externalize,
 	.pot_equals		=	_prop_dictionary_equals,
 	.pot_equals_finish	=	_prop_dictionary_equals_finish,
+#ifdef _PROP_MEMSTAT
+	.pot_memstat		=	_prop_dictionary_memstat,
+#endif
 };
 
 static _prop_object_free_rv_t
@@ -522,6 +528,65 @@ _prop_dictionary_equals_finish(prop_object_t v1, prop_object_t v2)
  	_PROP_RWLOCK_UNLOCK(((prop_dictionary_t)v1)->pd_rwlock);
  	_PROP_RWLOCK_UNLOCK(((prop_dictionary_t)v2)->pd_rwlock);
 }
+
+#ifdef _PROP_MEMSTAT
+static bool
+_prop_dictionary_memstat(prop_object_t obj, size_t *dmemp)
+{
+	prop_dictionary_t pd = obj;
+	prop_dictionary_keysym_t pdk;
+	struct _prop_object *po;
+	prop_object_iterator_t pi;
+	bool rv = true;
+
+	_PROP_ASSERT(dmemp != NULL);
+
+	_PROP_RWLOCK_RDLOCK(pd->pd_rwlock);
+
+	if (pd->pd_count == 0)
+		goto out;
+
+	pi = _prop_dictionary_iterator_locked(pd);
+	if (pi == NULL) {
+		rv = false;
+		goto out;
+	}
+	
+	while ((pdk =
+	    _prop_dictionary_iterator_next_object_locked(pi)) != NULL) {
+		po = _prop_dictionary_get_keysym(pd, pdk, true);
+		if (po == NULL) {
+			rv = false;
+			goto out;
+		}
+
+		if (po->po_type->pot_memstat == NULL)
+			continue;
+		
+		rv = (*po->po_type->pot_memstat)(po, dmemp);
+		if (!rv) {
+			prop_object_iterator_release(pi);
+			goto out;
+		}
+
+		if (pdk->pdk_size <= PDK_SIZE_16)
+			*dmemp += PDK_SIZE_16;
+		else if (pdk->pdk_size <= PDK_SIZE_32)
+			*dmemp += PDK_SIZE_32;
+		else if (pdk->pdk_size <= PDK_SIZE_128)
+			*dmemp += PDK_SIZE_128;
+
+	}
+
+	prop_object_iterator_release(pi);
+
+ out:
+	*dmemp += sizeof(*pd);
+
+	_PROP_RWLOCK_UNLOCK(pd->pd_rwlock);
+	return (rv);
+}
+#endif
 
 static prop_dictionary_t
 _prop_dictionary_alloc(unsigned int capacity)

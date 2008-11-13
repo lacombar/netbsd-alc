@@ -1097,6 +1097,27 @@ prop_object_release(prop_object_t obj)
 }
 
 /*
+ *
+ */
+#ifdef _PROP_MEMSTAT
+bool
+prop_object_memstat(prop_object_t obj, size_t *dmemp)
+{
+	struct _prop_object *po = obj;
+	bool rv = true;
+
+	_PROP_ASSERT(dmemp != NULL);
+
+	*dmemp = 0;
+
+	if (po->po_type->pot_memstat != NULL)
+		rv = (*po->po_type->pot_memstat)(obj, dmemp);
+
+	return rv;
+}
+#endif
+
+/*
  * prop_object_type --
  *	Return the type of an object.
  */

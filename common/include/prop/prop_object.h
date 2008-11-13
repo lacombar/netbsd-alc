@@ -65,6 +65,10 @@ typedef struct _prop_object_iterator *prop_object_iterator_t;
 prop_object_t	prop_object_iterator_next(prop_object_iterator_t);
 void		prop_object_iterator_reset(prop_object_iterator_t);
 void		prop_object_iterator_release(prop_object_iterator_t);
+
+#ifdef _PROP_MEMSTAT
+bool		prop_object_memstat(prop_object_t, size_t *);
+#endif
 __END_DECLS
 
 #endif /* _PROPLIB_PROP_OBJECT_H_ */

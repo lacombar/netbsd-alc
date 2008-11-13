@@ -211,6 +211,13 @@ struct _prop_object_type {
 	 * _PROP_OBJECT_EQUALS_RECURSE
 	 */
 	void	(*pot_equals_finish)(prop_object_t, prop_object_t);
+
+#ifdef _PROP_MEMSTAT
+	/*
+	 * func to measure memory used by the given object
+	 */
+	bool	(*pot_memstat)(prop_object_t, size_t *);
+#endif
 };
 
 struct _prop_object {

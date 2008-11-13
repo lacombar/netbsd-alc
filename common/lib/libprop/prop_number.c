@@ -73,12 +73,18 @@ static _prop_object_equals_rv_t
 		_prop_number_equals(prop_object_t, prop_object_t,
 				    void **, void **,
 				    prop_object_t *, prop_object_t *);
+#ifdef _PROP_MEMSTAT
+static bool	_prop_number_memstat(prop_object_t, size_t *);
+#endif
 
 static const struct _prop_object_type _prop_object_type_number = {
 	.pot_type	=	PROP_TYPE_NUMBER,
 	.pot_free	=	_prop_number_free,
 	.pot_extern	=	_prop_number_externalize,
 	.pot_equals	=	_prop_number_equals,
+#ifdef _PROP_MEMSTAT
+	.pot_memstat	=	_prop_number_memstat,
+#endif
 };
 
 #define	prop_object_is_number(x)	\
@@ -240,6 +246,20 @@ _prop_number_equals(prop_object_t v1, prop_object_t v2,
 	else
 		return _PROP_OBJECT_EQUALS_FALSE;
 }
+
+#ifdef _PROP_MEMSTAT
+static bool
+_prop_number_memstat(prop_object_t obj, size_t *dmemp)
+{
+	prop_number_t pn = obj;
+
+	_PROP_ASSERT(dmemp != NULL);
+
+	*dmemp += sizeof(*pn);
+
+	return true;
+}
+#endif
 
 static prop_number_t
 _prop_number_alloc(const struct _prop_number_value *pnv)

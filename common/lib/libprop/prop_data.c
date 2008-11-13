@@ -71,12 +71,18 @@ static _prop_object_equals_rv_t
 		_prop_data_equals(prop_object_t, prop_object_t,
 				  void **, void **,
 				  prop_object_t *, prop_object_t *);
+#ifdef _PROP_MEMSTAT
+static bool	_prop_data_memstat(prop_object_t, size_t *);
+#endif
 
 static const struct _prop_object_type _prop_object_type_data = {
 	.pot_type	=	PROP_TYPE_DATA,
 	.pot_free	=	_prop_data_free,
 	.pot_extern	=	_prop_data_externalize,
 	.pot_equals	=	_prop_data_equals,
+#ifdef _PROP_MEMSTAT
+	.pot_memstat	=	_prop_data_memstat,
+#endif
 };
 
 #define	prop_object_is_data(x)		\
@@ -197,6 +203,22 @@ _prop_data_equals(prop_object_t v1, prop_object_t v2,
 	else
 		return _PROP_OBJECT_EQUALS_FALSE;
 }
+
+#ifdef _PROP_MEMSTAT
+static bool
+_prop_data_memstat(prop_object_t obj, size_t *dmemp)
+{
+	prop_data_t pd = obj;
+	
+	_PROP_ASSERT(dmemp != NULL);
+
+	*dmemp += sizeof(*pd);
+	if ((pd->pd_flags & PD_F_NOCOPY) == 0)
+		*dmemp += pd->pd_size;
+	
+	return true;
+}
+#endif
 
 static prop_data_t
 _prop_data_alloc(void)

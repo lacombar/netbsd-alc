@@ -60,12 +60,18 @@ static _prop_object_equals_rv_t
 		_prop_string_equals(prop_object_t, prop_object_t,
 				    void **, void **,
 				    prop_object_t *, prop_object_t *);
+#ifdef _PROP_MEMSTAT
+static bool	_prop_string_memstat(prop_object_t, size_t *);
+#endif
 
 static const struct _prop_object_type _prop_object_type_string = {
 	.pot_type	=	PROP_TYPE_STRING,
 	.pot_free	=	_prop_string_free,
 	.pot_extern	=	_prop_string_externalize,
 	.pot_equals	=	_prop_string_equals,
+#ifdef _PROP_MEMSTAT
+	.pot_memstat	=	_prop_string_memstat,
+#endif
 };
 
 #define	prop_object_is_string(x)	\
@@ -121,6 +127,24 @@ _prop_string_equals(prop_object_t v1, prop_object_t v2,
 	else
 		return (_PROP_OBJECT_EQUALS_TRUE);
 }
+
+#ifdef _PROP_MEMSTAT
+static bool
+_prop_string_memstat(prop_object_t obj, size_t *dmemp)
+{
+	prop_string_t ps = obj;
+
+	printf("string: %d\n", sizeof(*ps));
+
+	_PROP_ASSERT(dmemp != NULL);
+
+	*dmemp += sizeof(*ps);
+	if ((ps->ps_flags & PS_F_NOCOPY) == 0)
+		*dmemp += ps->ps_size + 1;
+
+	return true;
+}
+#endif
 
 static prop_string_t
 _prop_string_alloc(void)

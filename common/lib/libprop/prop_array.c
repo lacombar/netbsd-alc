@@ -64,6 +64,9 @@ static _prop_object_equals_rv_t
 				   void **, void **,
 				   prop_object_t *, prop_object_t *);
 static void	_prop_array_equals_finish(prop_object_t, prop_object_t);
+#ifdef _PROP_MEMSTAT
+static bool	_prop_array_memstat(prop_object_t, size_t *);
+#endif
 static prop_object_iterator_t
 		_prop_array_iterator_locked(prop_array_t);
 static prop_object_t
@@ -77,6 +80,9 @@ static const struct _prop_object_type _prop_object_type_array = {
 	.pot_extern		=	_prop_array_externalize,
 	.pot_equals		=	_prop_array_equals,
 	.pot_equals_finish	=	_prop_array_equals_finish,
+#ifdef _PROP_MEMSTAT
+	.pot_memstat		=	_prop_array_memstat,
+#endif
 };
 
 #define prop_object_is_array(x)		\
@@ -254,6 +260,49 @@ _prop_array_equals_finish(prop_object_t v1, prop_object_t v2)
 	_PROP_RWLOCK_UNLOCK(((prop_array_t)v1)->pa_rwlock);
 	_PROP_RWLOCK_UNLOCK(((prop_array_t)v2)->pa_rwlock);
 }
+
+#ifdef _PROP_MEMSTAT
+static bool
+_prop_array_memstat(prop_object_t obj, size_t *dmemp)
+{
+	prop_object_iterator_t pi;
+	prop_array_t pa = obj;
+	struct _prop_object *po;
+	bool rv = true;
+
+	_PROP_ASSERT(dmemp != NULL);
+
+	_PROP_RWLOCK_RDLOCK(pa->pa_rwlock);
+
+	if (pa->pa_count == 0)
+		goto out;
+
+	pi = _prop_array_iterator_locked(pa);
+	if (pi == NULL) {
+		rv = false;
+		goto out;
+	}
+
+	while ((po = _prop_array_iterator_next_object_locked(pi)) != NULL) {
+		if (po->po_type->pot_memstat == NULL)
+			continue;
+
+		rv = (*po->po_type->pot_memstat)(po, dmemp);
+		if (!rv) {
+			prop_object_iterator_release(pi);
+			goto out;
+		}
+	}
+
+	prop_object_iterator_release(pi);
+
+ out:
+	*dmemp += sizeof(*pa);
+
+	_PROP_RWLOCK_UNLOCK(pa->pa_rwlock);
+	return rv;
+}
+#endif
 
 static prop_array_t
 _prop_array_alloc(unsigned int capacity)
