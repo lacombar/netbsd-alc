@@ -263,7 +263,7 @@ prop_data_create_data(const void *v, size_t size)
 
 /*
  * prop_data_create_data_nocopy --
- *	Create an immutable data container that contains a refrence to the
+ *	Create an immutable data container that contains a reference to the
  *	provided external data.
  */
 prop_data_t

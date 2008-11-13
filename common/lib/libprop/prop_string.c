@@ -202,7 +202,7 @@ prop_string_create_cstring(const char *str)
 
 /*
  * prop_string_create_cstring_nocopy --
- *	Create an immutable string that contains a refrence to the
+ *	Create an immutable string that contains a reference to the
  *	provided C string.
  */
 prop_string_t

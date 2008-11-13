@@ -354,7 +354,7 @@ _prop_dictionary_free(prop_stack_t stack, prop_object_t *obj)
 	_PROP_ASSERT((pd->pd_capacity == 0 && pd->pd_array == NULL) ||
 		     (pd->pd_capacity != 0 && pd->pd_array != NULL));
 
-	/* The empty dictorinary is easy, handle that first. */
+	/* The empty dictionary is easy, handle that first. */
 	if (pd->pd_count == 0) {
 		if (pd->pd_array != NULL)
 			_PROP_FREE(pd->pd_array, M_PROP_DICT);
