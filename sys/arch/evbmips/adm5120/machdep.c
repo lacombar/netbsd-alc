@@ -158,7 +158,7 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.6 2008/07/02 17:28:55 ad Exp $");
 #include <mips/adm5120/dev/uart.h>
 
 #ifndef	MEMSIZE
-#define	MEMSIZE 4 * 1024 * 1024
+#define	MEMSIZE 0
 #endif /* !MEMSIZE */
 
 struct	user *proc0paddr;
@@ -244,9 +244,6 @@ parse_args(prop_dictionary_t properties, int argc, char **argv,
 	int i;
 	uint8_t enaddr[ETHER_ADDR_LEN];
 
-	if (memsizep != NULL)
-		*memsizep = MEMSIZE;
-
 	for (i = 0; i < argc && argv[i] != NULL; i++) {
 		if (strlcpy(buf, argv[i], sizeof(buf)) >= sizeof(buf))
 			goto err;
@@ -313,7 +310,7 @@ void
 mach_init(int argc, char **argv, void *a2, void *a3)
 {
 	struct adm5120_config *admc = &adm5120_configuration;
-	uint32_t memsize;
+	uint32_t memsize = MEMSIZE;
 	vaddr_t kernend;
 	u_long first, last;
 	vaddr_t v;
