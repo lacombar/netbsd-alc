@@ -319,6 +319,7 @@ extio_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	if (gpio_pin_map(sc->sc_gpio, 0, __BITS(0, 4), &sc->sc_pm) != 0) {
 		aprint_error_dev(&sc->sc_dev, "failed to map GPIO[1:2]\n");
+		return;
 	}
 	EXTIO_DPRINTF("%s: %d\n", __func__, __LINE__);
 	gpio_pin_ctl(sc->sc_gpio, &sc->sc_pm, 0, GPIO_PIN_INPUT);
