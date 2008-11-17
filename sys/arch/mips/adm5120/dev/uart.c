@@ -62,6 +62,10 @@ __KERNEL_RCSID(0, "$NetBSD: uart.c,v 1.5 2008/06/11 23:55:20 cegger Exp $");
 #define REG_READ(o)	bus_space_read_4(sc->sc_st, sc->sc_ioh, (o))
 #define REG_WRITE(o,v)	bus_space_write_4(sc->sc_st, sc->sc_ioh, (o),(v))
 
+#ifndef CONSPEED
+#define CONSPEED 115200
+#endif
+
 cons_decl(uart_);
 
 extern struct consdev *cn_tab;          /* physical console device info */
@@ -211,7 +215,7 @@ uart_open(dev_t dev, int flag, int mode, struct lwp *l)
 		tp->t_oflag = TTYDEF_OFLAG;
 		tp->t_cflag = TTYDEF_CFLAG | CLOCAL;
 		tp->t_lflag = TTYDEF_LFLAG;
-		tp->t_ispeed = tp->t_ospeed = 115200;
+		tp->t_ispeed = tp->t_ospeed = CONSPEED;
 		ttsetwater(tp);
 	} else if (kauth_authorize_device_tty(l->l_cred, KAUTH_DEVICE_TTY_OPEN,
 	    tp) != 0) {
