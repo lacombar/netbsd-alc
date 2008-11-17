@@ -54,6 +54,7 @@ __KERNEL_RCSID(0, "$NetBSD: uart.c,v 1.5 2008/06/11 23:55:20 cegger Exp $");
 #include <machine/intr.h>
 #include <machine/bus.h>
 
+#include <mips/adm5120/include/adm5120reg.h>
 #include <mips/adm5120/include/adm5120var.h>
 #include <mips/adm5120/include/adm5120_obiovar.h>
 #include <dev/cons.h>
@@ -174,17 +175,29 @@ uart_cnattach(void)
 void
 uart_cnputc(dev_t dev, int c)
 {
-	char chr;
-	chr = c;
-	while ((*((volatile unsigned long *)0xb2600018)) & 0x20) ;
-	(*((volatile unsigned long *)0xb2600000)) = c;
+	uint32_t reg;
+
+	for (;;) {
+		reg = _REG_READ(ADM5120_BASE_UART0, UART_FR_REG);
+		if (!ISSET(reg, UART_FR_TX_FIFO_FULL))
+			break;
+	}
+
+	_REG_WRITE(ADM5120_BASE_UART0, UART_DR_REG, c);
 }
 
 int
 uart_cngetc(dev_t dev)
 {
-	while ((*((volatile unsigned long *)0xb2600018)) & 0x10) ;
-	return (*((volatile unsigned long *)0xb2600000)) & 0xff;
+	uint32_t reg;
+
+	for (;;) {
+		reg = _REG_READ(ADM5120_BASE_UART0, UART_FR_REG);
+		if (!ISSET(reg, UART_FR_RX_FIFO_EMPTY))
+			break;
+	}
+
+	return _REG_READ(ADM5120_BASE_UART0, UART_DR_REG);
 }
 
 void
