@@ -151,18 +151,15 @@ obio_attach(struct device *parent, struct device *self, void *aux)
 	obio_found = 1;
 	printf("\n");
 
-	OBIO_DPRINTF("%s: %d\n", __func__, __LINE__);
-
-	OBIO_DPRINTF("%s: %d\n", __func__, __LINE__);
 	for (od = obiodevs; od->od_name != NULL; od++) {
-		OBIO_DPRINTF("%s: %d\n", __func__, __LINE__);
+		OBIO_DPRINTF("%s: trying to attach `%s' at 0x%.8lx\n", __func__,
+		    od->od_name, od->od_addr);
 		obio_attach_args_create(&oa, od, ma->ma_gpio, ma->ma_dmat,
 		    ma->ma_obiot);
-		OBIO_DPRINTF("%s: %d\n", __func__, __LINE__);
+
 		(void)config_found_sm_loc(self, "obio", NULL, &oa, obio_print,
 		    obio_submatch);
 	}
-	OBIO_DPRINTF("%s: %d\n", __func__, __LINE__);
 }
 
 static int
