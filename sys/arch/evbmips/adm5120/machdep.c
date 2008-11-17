@@ -115,6 +115,8 @@ __KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.6 2008/07/02 17:28:55 ad Exp $");
 #include "opt_memsize.h"
 #include "opt_ethaddr.h"
 
+#include "extio.h"
+
 #include "opt_pci.h"
 #include "pci.h"
 
@@ -347,7 +349,9 @@ mach_init(int argc, char **argv, void *a2, void *a3)
 	 * Initialize bus space tags.
 	 */
 	obio_bus_mem_init(&admc->obio_space, admc);
+#if NEXTIO > 0
 	extio_bus_mem_init(&admc->extio_space, admc);
+#endif
 #if NPCI > 0
 	pciio_bus_mem_init(&admc->pciio_space, admc);
 	pcimem_bus_mem_init(&admc->pcimem_space, admc);

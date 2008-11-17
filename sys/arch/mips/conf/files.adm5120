@@ -13,7 +13,7 @@ file	arch/mips/adm5120/adm5120_obio_space.c		obio
 file    arch/mips/adm5120/dev/admgpio.c         	mainbus
 
 file	arch/mips/adm5120/adm5120_cfio.c		extio
-file	arch/mips/adm5120/adm5120_extio.c		extio
+file	arch/mips/adm5120/adm5120_extio.c		extio	needs-flag
 file	arch/mips/adm5120/adm5120_extio_space.c		extio
 
 # On-chip PCI host bridge
