@@ -109,7 +109,7 @@ void	uart_start(struct tty *);
 int	uart_param(struct tty *, struct termios *);
 int	uart_intr(void *);
 
-CFATTACH_DECL(uart, sizeof(struct uart_softc),
+CFATTACH_DECL_NEW(uart, sizeof(struct uart_softc),
     uart_probe, uart_attach, NULL, NULL);
 
 static int
@@ -160,7 +160,7 @@ uart_attach(struct device *parent, struct device *self, void *aux)
 	if (minor == 0 && uart_consattached) {
 		/* attach as console*/
 		cn_tab->cn_dev = tp->t_dev;
-		aprint_error_dev(self, " console\n");
+		aprint_error_dev(self, "console\n");
 	}
 }
 
