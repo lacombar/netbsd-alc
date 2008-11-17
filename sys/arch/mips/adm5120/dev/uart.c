@@ -76,18 +76,17 @@ dev_type_poll(uart_poll);
 dev_type_stop(uart_stop);
 
 const struct cdevsw uart_cdevsw = {
-	        uart_open, uart_close, uart_read, uart_write, uart_ioctl,
-		        uart_stop, uart_tty, uart_poll, nommap, ttykqfilter, D_TTY
+	uart_open, uart_close, uart_read, uart_write, uart_ioctl,
+	uart_stop, uart_tty, uart_poll, nommap, ttykqfilter, D_TTY
 };
 
 
 struct consdev uartcons = {
-	        NULL, NULL, uart_cngetc, uart_cnputc, uart_cnpollc, NULL, NULL, NULL,
-		        NODEV, CN_NORMAL
+	NULL, NULL, uart_cngetc, uart_cnputc, uart_cnpollc, NULL, NULL, NULL,
+	NODEV, CN_NORMAL
 };
 
 struct uart_softc {
-        struct device               sc_dev;
 	struct tty 	   	    *sc_tty;
 
         bus_space_tag_t             sc_st;
@@ -122,29 +121,30 @@ uart_probe(struct device *parent, struct cfdata *cf, void *aux)
 static void
 uart_attach(struct device *parent, struct device *self, void *aux)
 {
+        struct uart_softc *sc = device_private(self);
         struct obio_attach_args *oba = aux;
-        struct uart_softc *sc = (struct uart_softc *)self;
 	struct tty *tp;
 	int maj, minor;
 			
+        printf("\n");
+
         sc->sc_st = oba->oba_st;
         if (bus_space_map(oba->oba_st, oba->oba_addr, 256, 0,
             &sc->sc_ioh)) {
-                printf("%s: unable to map device\n", sc->sc_dev.dv_xname);
+                aprint_error_dev(self, "unable to map device\n");
                 return;
 	}
 
 	/* Establish the interrupt. */
 	sc->sc_ih = adm5120_intr_establish(oba->oba_irq, INTR_FIQ, uart_intr, sc);
 	if (sc->sc_ih == NULL) {
-		printf("%s: unable to establish interrupt\n",
-		    sc->sc_dev.dv_xname);
+		aprint_error_dev(self, "unable to establish interrupt\n");
 		return;
 	}
 	REG_WRITE(UART_CR_REG,UART_CR_PORT_EN|UART_CR_RX_INT_EN|UART_CR_RX_TIMEOUT_INT_EN);
 
 	maj = cdevsw_lookup_major(&uart_cdevsw);
-	minor = sc->sc_dev.dv_unit;
+	minor = device_unit(self);
 
 	tp = ttymalloc();
 	tp->t_oproc = uart_start;
@@ -155,9 +155,8 @@ uart_attach(struct device *parent, struct device *self, void *aux)
 	if (minor == 0 && uart_consattached) {
 		/* attach as console*/
 		cn_tab->cn_dev = tp->t_dev;
-		printf(" console");
+		aprint_error_dev(self, " console\n");
 	}
-        printf("\n");
 }
 
 int 
