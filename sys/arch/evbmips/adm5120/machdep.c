@@ -378,19 +378,15 @@ mach_init(int argc, char **argv, void *a2, void *a3)
 	parse_args(NULL, argc, argv, &memsize);
 
 	/*
-	 * Determine the memory size.
+	 * Determine the memory size if the bootloader didn't do it for us.
 	 *
 	 * Note: Reserve the first page!  That's where the trap
 	 * vectors are located.
 	 */
-
-#if 0
-	if (GET_MEMSIZE(memsize) == 0) {
+	if (memsize == 0) {
 		uint32_t val;
 
-		/* This does not seem to work... --dyoung */
 		val = SW_READ(SW_MEMCONT_REG);
-		printf("SW_MEMCONT_REG: 0x%08" PRIx32 "\n", val);
 		switch (val & SDRAM_SIZE_MASK) {
 		case SDRAM_SIZE_4MBYTES:
 			memsize = 4 * 1024 * 1024;
@@ -411,7 +407,6 @@ mach_init(int argc, char **argv, void *a2, void *a3)
 			panic("adm5120: cannot determine memory size");
 		}
 	}
-#endif
 
 	physmem = btoc(memsize);
 
