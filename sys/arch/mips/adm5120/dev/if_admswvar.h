@@ -125,7 +125,7 @@ struct admsw_descsoft {
  * Software state per device.
  */
 struct admsw_softc {
-	struct device sc_dev;		/* generic device information */
+	device_t sc_dev;		/* generic device information */
 	uint8_t		sc_enaddr[ETHER_ADDR_LEN];
 	bus_dma_tag_t sc_dmat;		/* bus DMA tag */
 	bus_space_tag_t sc_st;		/* bus space tag */
