@@ -117,7 +117,6 @@ do {						\
 #define	ADMPCI_MAX_DEVICE
 
 struct admpci_softc {
-	struct device			sc_dev;
 	struct mips_pci_chipset		sc_pc;
 
 	bus_space_tag_t			sc_memt;
@@ -153,7 +152,7 @@ static struct extent	*mem_ex = NULL;
 
 #endif	/* NPCI > 0 */
 
-CFATTACH_DECL(admpci, sizeof(struct admpci_softc),
+CFATTACH_DECL_NEW(admpci, sizeof(struct admpci_softc),
     admpcimatch, admpciattach, NULL, NULL);
 
 int admpci_found = 0;
@@ -180,8 +179,8 @@ void
 admpciattach(struct device *parent, struct device *self, void *aux)
 {
 	struct adm5120_config		*admc = &adm5120_configuration;
-	struct admpci_softc		*sc = (struct admpci_softc *)self;
-	struct mainbus_attach_args	*ma = (struct mainbus_attach_args *)aux;
+	struct admpci_softc		*sc = device_private(self);
+	struct mainbus_attach_args	*ma = aux;
 #if NPCI > 0
 	u_long				result;
 	pcitag_t			tag;
@@ -189,25 +188,25 @@ admpciattach(struct device *parent, struct device *self, void *aux)
 #endif
 	
 	admpci_found = 1;
+	printf("\n");
 
 	sc->sc_conft = ma->ma_obiot;
 	if (bus_space_map(sc->sc_conft, ADM5120_BASE_PCI_CONFDATA, 4, 0,
 		&sc->sc_datah) != 0) {
-		printf(
-		    "\n%s: unable to map PCI Configuration Data register\n",
-		    device_xname(&sc->sc_dev));
+		aprint_error_dev(self,
+		    "unable to map PCI Configuration Data register\n");
 		return;
 	}
 	if (bus_space_map(sc->sc_conft, ADM5120_BASE_PCI_CONFADDR, 4, 0,
 		&sc->sc_addrh) != 0) {
-		printf(
-		    "\n%s: unable to map PCI Configuration Address register\n",
-		    device_xname(&sc->sc_dev));
+		aprint_error_dev(self,
+		    "unable to map PCI Configuration Address register\n");
 		return;
 	}
 
-	printf(": ADM5120 Host-PCI Bridge, data %lx addr %lx, sc %p\n",
-	    sc->sc_datah, sc->sc_addrh, (void *)sc);
+	aprint_normal_dev(self, "ADM5120 Host-PCI Bridge\n");
+	ADMPCI_DPRINTF("%s: data %lx addr %lx, sc %p\n", __func__,
+	    sc->sc_datah, sc->sc_addrh, sc);
 
 #if NPCI > 0
 	sc->sc_memt = &admc->pcimem_space;
