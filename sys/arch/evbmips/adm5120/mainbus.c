@@ -83,6 +83,9 @@ __KERNEL_RCSID(0, "$NetBSD: mainbus.c,v 1.1 2007/03/20 08:52:00 dyoung Exp $");
 
 #include "locators.h"
 
+#include "extio.h"
+#include "pci.h"
+
 static int	mainbus_match(struct device *, struct cfdata *, void *);
 static void	mainbus_attach(struct device *, struct device *, void *);
 static int	mainbus_print(void *, const char *);
@@ -100,8 +103,12 @@ struct mainbusdev {
 struct mainbusdev mainbusdevs[] = {
 	{"cpu"		},
 	{"obio"		},
+#if NEXTIO > 0
 	{"extio"	},
+#endif
+#if NPCI > 0
 	{"admpci"	},
+#endif
 	{NULL		}
 };
 
