@@ -559,7 +559,7 @@ admsw_start(struct ifnet *ifp)
 
 	/*
 	 * Loop through the send queues, setting up transmit descriptors
-	 * unitl we drain the queues, or use up all available transmit
+	 * until we drain the queues, or use up all available transmit
 	 * descriptors.
 	 */
 	for (;;) {
