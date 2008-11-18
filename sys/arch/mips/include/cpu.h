@@ -344,6 +344,8 @@ do {									\
 struct lwp;
 struct user;
 
+struct device; /* XXX */
+
 extern struct segtab *segbase;	/* current segtab base */
 
 /* trap.c */
@@ -362,7 +364,7 @@ int	badaddr(void *, size_t);
 int	badaddr64(uint64_t, size_t);
 
 /* mips_machdep.c */
-void	cpu_identify(void);
+void	cpu_identify(struct device *);
 void	mips_vector_init(void);
 
 #endif /* ! _LOCORE */

@@ -76,8 +76,7 @@ __KERNEL_RCSID(0, "$NetBSD: cpu.c,v 1.3 2007/10/17 19:54:14 garbled Exp $");
 static int	cpu_match(struct device *, struct cfdata *, void *);
 static void	cpu_attach(struct device *, struct device *, void *);
 
-CFATTACH_DECL(cpu, sizeof(struct device),
-    cpu_match, cpu_attach, NULL, NULL);
+CFATTACH_DECL_NEW(cpu, 0, cpu_match, cpu_attach, NULL, NULL);
 
 static int
 cpu_match(struct device *parent, struct cfdata *match, void *aux)
@@ -90,11 +89,12 @@ static void
 cpu_attach(struct device *parent, struct device *self, void *aux)
 {
 
-	printf(": %lu.%02luMHz (hz cycles = %lu, delay divisor = %lu)\n",
+	printf("\n");
+	aprint_normal_dev(self,
+	    "%lu.%02luMHz (hz cycles = %lu, delay divisor = %lu)\n",
 	    curcpu()->ci_cpu_freq / 1000000,
 	    (curcpu()->ci_cpu_freq % 1000000) / 10000,
 	    curcpu()->ci_cycles_per_hz, curcpu()->ci_divisor_delay);
 
-	printf("%s: ", self->dv_xname);
-	cpu_identify();
+	cpu_identify(self);
 }
