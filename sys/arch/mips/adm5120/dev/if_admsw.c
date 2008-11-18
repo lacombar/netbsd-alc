@@ -599,7 +599,7 @@ admsw_start(struct ifnet *ifp)
 
 		/*
 		 * Load the DMA map.  If this fails, the packet either
-		 * didn't fit in the alloted number of segments, or we
+		 * didn't fit in the allocated number of segments, or we
 		 * were short on resources.  In this case, we'll copy
 		 * and try again.
 		 */
