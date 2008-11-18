@@ -818,12 +818,17 @@ admsw_intr(void *arg)
 	uint32_t pending;
 	char buf[64];
 
+#define PROCESSED_INTERRUPTS \
+	(ADMSW_INTR_RHD|ADMSW_INTR_RLD|ADMSW_INTR_SHD|ADMSW_INTR_SLD)
+
 	pending = REG_READ(ADMSW_INT_ST);
 
-	if ((pending & ~(ADMSW_INTR_RHD|ADMSW_INTR_RLD|ADMSW_INTR_SHD|ADMSW_INTR_SLD|ADMSW_INTR_W1TE|ADMSW_INTR_W0TE)) != 0) {
-		printf("%s: pending=%s\n", __func__,
-		    bitmask_snprintf(pending, ADMSW_INT_FMT, buf, sizeof(buf)));
+	if ((pending & ~PROCESSED_INTERRUPTS) != 0) {
+		bitmask_snprintf(pending & ~(PROCESSED_INTERRUPTS),
+		    ADMSW_INT_FMT, buf, sizeof(buf));
+		printf("%s: pending=%s\n", __func__, buf);
 	}
+#undef PROCESSED_INTERRUPTS
 	REG_WRITE(ADMSW_INT_ST, pending);
 
 	if (sc->ndevs == 0)
