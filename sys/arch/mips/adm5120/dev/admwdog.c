@@ -58,12 +58,14 @@ static int admwdog_tickle(struct sysmon_wdog *smw);
 static inline uint32_t
 admwdog_read(struct admsw_softc *sc)
 {
+
 	return bus_space_read_4(sc->sc_st, sc->sc_ioh, ADM5120_WDOG0);
 }
 
 static inline void
 admwdog_write(struct admsw_softc *sc, uint32_t val)
 {
+
 	bus_space_write_4(sc->sc_st, sc->sc_ioh, ADM5120_WDOG0, val);
 }
 
@@ -122,7 +124,7 @@ admwdog_attach(struct admsw_softc *sc)
 	/* deactivate watchdog */
 	admwdog_write(sc, 0);
 
-	smw->smw_name = device_xname(&sc->sc_dev);
+	smw->smw_name = device_xname(sc->sc_dev);
 	smw->smw_cookie = sc;
 	smw->smw_setmode = admwdog_setmode;
 	smw->smw_tickle = admwdog_tickle;
